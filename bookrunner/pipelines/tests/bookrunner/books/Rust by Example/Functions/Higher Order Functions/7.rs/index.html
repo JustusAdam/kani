@@ -1,0 +1,1603 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>
+    Pipeline tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs
+  </title>
+<style>
+#title{
+  background-color: #ec407a;
+  color: white;
+  padding: 2em;
+}
+h1 {
+  margin-bottom: 0em;
+}
+#subtitle {
+  font-variant: small-caps;
+  text-transform: lowercase;
+  letter-spacing: 0.2em;
+}
+.run-info ul {
+  list-style: none;
+}
+.run-info ul li {
+  display: inline;
+  margin-right: 6em;
+  margin-left: -3em;
+  text-transform: uppercase;
+  font-size: small;
+  color: #ec407a;
+}
+#content {
+  max-width: 800px;
+  margin-left: auto;
+  margin-right: auto;
+  padding-top: 2em;
+  color: #263238;
+  font-family: Helvetica, sans-serif;
+}
+p {
+  margin: 0;
+}
+.command-table {
+  background-color: #eceff1;
+  padding: 0.3em;
+  border-radius: 0.3em;
+  margin-bottom: 4em;
+}
+.command-table .fail-ignored {
+  background-color: #e65100cc;
+  padding: 0.3em;
+  border-radius: 0.3em;
+}
+.command-table .success {
+  background-color: #1a237ecc;
+  padding: 0.3em;
+  border-radius: 0.3em;
+}
+.command-table .in-progress {
+  background-color: black;
+  padding: 0.3em;
+  border-radius: 0.3em;
+}
+.command-table .non-started {
+  background-color: #26323844;
+  padding: 0.3em;
+  border-radius: 0.3em;
+}
+.command-table .fail {
+  background-color: #f44336cc;
+  padding: 0.3em;
+  border-radius: 0.3em;
+}
+.command-content {
+  background-color: #eceff1;
+  padding: 1em;
+}
+.command-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 1em;
+}
+.command-id-link{
+  flex-grow: 0;
+}
+.command-id-link a {
+  font-size: xx-large;
+  text-align: center;
+  font-weight: bold;
+  text-shadow: 1px  1px 0px #000000bb,
+              -1px -1px 0px #ffffffbb;
+  text-decoration: none;
+  margin-left: 0.2em;
+}
+.command-id-link a:link {
+  text-shadow: 1px  1px 0px #000000bb,
+              -1px -1px 0px #ffffffbb;
+}
+.command-id-link a:visited {
+  text-shadow: 1px  1px 0px #000000bb,
+              -1px -1px 0px #ffffffbb;
+}
+.command-id-link a:visited:hover {
+  color: #ec407a;
+  background-color: #00000000;
+  text-shadow: 1px  1px 0px #000000bb,
+              -1px -1px 0px #ffffffbb,
+               0px 0px 10px #fff,
+               0px 0px 5px #ec407a,
+               0px 0px 5px #ec407a;
+}
+.command-id-link a:hover {
+  color: #ec407a;
+  background-color: #00000000;
+  text-shadow: 1px  1px 0px #000000bb,
+              -1px -1px 0px #ffffffbb
+               0px 0px 10px #fff,
+               0px 0px 5px #ec407a,
+               0px 0px 5px #ec407a;
+}
+.command-id-link a:active {
+  color: #ffeb3b;
+  background-color: #00000000;
+  text-shadow: 1px  1px 0px #000000bb,
+              -1px -1px 0px #ffffffbb,
+                 0px 0px 10px #fff,
+                 0px 0px 5px #ffeb3b,
+                 0px 0px 5px #ffeb3b;
+}
+.command-id-link a:visited:active {
+  color: #ffeb3b;
+  background-color: #00000000;
+  text-shadow: 1px  1px 0px #000000bb,
+              -1px -1px 0px #ffffffbb,
+                 0px 0px 10px #fff,
+                 0px 0px 5px #ffeb3b,
+                 0px 0px 5px #ffeb3b;
+}
+.command-description {
+  color: #26323899;
+  font-size: smaller;
+  text-align: center;
+  font-weight: bold;
+  flex-grow: 1;
+}
+
+.command-invocation {
+  padding: 1em;
+  color: #fff;
+  background-color: #005662;
+  font-size: small;
+  font-family: monospace;
+  border-radius: 0.5em;
+  text-shadow: 0 0 2px #ffccbccc;
+}
+.command-stats-table {
+  margin-top: 0.2em;
+  border-radius: 0.5em;
+  padding: 0.2em;
+  padding-top: 0.4em;
+  display: flex;
+  flex-direction: column;
+  background-color: #eae3998a;
+  color: #263238cc;
+  margin-bottom: 0.2em;
+}
+.command-stats-row {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-evenly;
+  margin-top: 0.4em;
+  margin-bottom: 0.4em;
+  font-size: small;
+  text-transform: uppercase;
+}
+.command-stats-row p .value {
+  color: #00251aaa;
+  text-shadow: 0 0 2px #82ada944;
+  font-weight: bold;
+}
+.literal-stdout {
+  margin-top: 0.4em;
+  margin-bottom: 0.2em;
+  padding: 1em;
+  border-radius: 0.5em;
+  overflow-x: auto;
+  overflow-y: auto;
+}
+.output-box {
+  margin-top: 0.4em;
+  margin-bottom: 0.2em;
+  padding: 1em;
+  color: #000a12;
+  background-color: #cfd8dc;
+  font-size: small;
+  font-family: monospace;
+  border-radius: 0.5em;
+  max-height: 20em;
+  overflow-x: auto;
+  overflow-y: auto;
+}
+.output-box xmp{
+  white-space: pre;
+}
+.stage-name p {
+  margin-left: 0.5em;
+  color: #546e7a;
+  text-shadow:  -1px  0px 0px #fff
+               ,-2px  0px 0px #ffffff99
+               ,-1px  1px 0px #ffffff99
+               ;
+  font-size: 48pt;
+  font-variant: small-caps;
+  text-transform: lowercase;
+  font-weight: bold;
+  font-style: italic;
+}
+.stage-name .underline {
+  width: 100%;
+  height: 1.1em;
+  background-color: #546e7a;
+  margin-top: -1.6em;
+}
+.stage-name {
+  margin-top: 6em;
+  margin-bottom: 3em;
+}
+
+.outcome-table-info-box {
+  margin-top: 0.4em;
+  margin-bottom: 0.2em;
+  padding: 1em;
+  color: #000a12;
+  background-color: #ffee58;
+  border-radius: 0.5em;
+}
+.outcome-table-info-box .outcome{
+  font-weight: bold;
+}
+#toc {
+  margin-bottom: 6em;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 1;
+  margin-right: 3em;
+}
+.toc-title {
+  text-align: center;
+  font-variant: small-caps;
+  text-transform: lowercase;
+  margin-bottom: -1em;
+}
+.toc-section{
+  margin-top: 1em;
+  margin-bottom: 0.5em;
+  text-transform: capitalize;
+}
+.toc-row {
+  display: flex;
+  flex-direction: row;
+  justify-content: flex-start;
+  align-items: center;
+}
+.toc-row-icon {
+  padding-right: 8px;
+}
+.status-icon-cross {
+  fill: #f44336;
+    width: 16px;
+    height: 16px;
+}
+.status-icon-tick {
+  fill: #3f51b5;
+  stroke: #ffffff77;
+  stroke-width: 1px;
+  width: 16px;
+  height: 16px;
+}
+
+.status-icon-in-progress {
+  fill: #333;
+  width: 16px;
+  height: 16px;
+}
+
+.status-icon-in-progress circle {
+  stroke: #333;
+  stroke-width: 2px;
+  fill: none
+}
+a:link {
+  color: #1e88e5;
+}
+a:visited {
+  color: #1e88e5;
+}
+a:visited:hover {
+  background-color: #1e88e5;
+  color: #fff;
+  text-decoration: none;
+}
+a:hover {
+  background-color: #1e88e5;
+  color: #fff;
+  text-decoration: none;
+}
+a:active {
+  background-color: #ec407a;
+  color: #fff;
+  text-decoration: none;
+}
+a:visited:active {
+  background-color: #ec407a;
+  color: #fff;
+  text-decoration: none;
+}
+
+#contents-container {
+  margin-top: 6em;
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  align-content: flex-start;
+}
+
+#depgraph {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  align-content: flex-start;
+  flex-shrink: 7;
+}
+
+#depgraph-title p {
+  text-align: center;
+  font-variant: small-caps;
+  text-transform: lowercase;
+}
+
+#depgraph-preview img {
+  max-width: 100%;
+  max-height: 100%;
+}
+
+#depgraph-preview {
+  padding: 1em;
+}
+
+.memory-box {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.5em;
+  align-items: center;
+}
+.memory-preview {
+  width: 75%;
+}
+.memory-preview svg {
+  margin-left: -1em;
+  margin-right: -2em;
+}
+.memory-table {
+}
+.memory-title {
+  text-align: center;
+  font-style: bold;
+}
+.memory-subtitle {
+  text-transform: lowercase;
+  font-variant: small-caps;
+  text-align: center;
+  opacity: 0.8;
+}
+.memory-pad {
+  width: 1.5em;
+}
+.memory-value {
+  text-align: center;
+  margin-right: 2em;
+}
+.rss {
+  color: #ab47bc;
+}
+.vsz {
+  color: #4caf50;
+}
+
+
+@media (prefers-color-scheme: dark){
+  a:link {
+    color: #29b6f6;
+  }
+  a:visited {
+    color: #29b6f6;
+  }
+  a:visited:hover {
+    color: #263238;
+    background-color: #29b6f6;
+  }
+  a:hover {
+    color: #263238;
+    background-color: #29b6f6;
+  }
+  a:active {
+    color: #263238;
+    background-color: #ec407a;
+  }
+  a:visited:active {
+    color: #263238;
+    background-color: #ec407a;
+  }
+  .command-id-link a:link {
+    text-shadow: 1px  1px 0px #000000bb,
+                -1px -1px 0px #ffffffbb;
+  }
+  .command-id-link a:visited {
+    text-shadow: 1px  1px 0px #000000bb,
+                -1px -1px 0px #ffffffbb;
+  }
+  .command-id-link a:visited:hover {
+    color: #ec407a;
+    background-color: #00000000;
+    text-shadow: 1px  1px 0px #000000bb,
+                -1px -1px 0px #ffffffbb.
+                 0px 0px 10px #fff,
+                 0px 0px 5px #ec407a,
+                 0px 0px 5px #ec407a;
+  }
+  .command-id-link a:hover {
+    color: #ec407a;
+    background-color: #00000000;
+    text-shadow: 1px  1px 0px #000000bb,
+                -1px -1px 0px #ffffffbb,
+                 0px 0px 10px #fff,
+                 0px 0px 5px #ec407a,
+                 0px 0px 5px #ec407a;
+  }
+  .command-id-link a:active {
+    color: #ffeb3b;
+    background-color: #00000000;
+    text-shadow: 1px  1px 0px #000000bb,
+                -1px -1px 0px #ffffffbb,
+                 0px 0px 10px #fff,
+                 0px 0px 5px #ffeb3b,
+                 0px 0px 5px #ffeb3b;
+  }
+  .command-id-link a:visited:active {
+    color: #ffeb3b;
+    background-color: #00000000;
+    text-shadow: 1px  1px 0px #000000bb,
+                -1px -1px 0px #ffffffbb,
+                 0px 0px 10px #fff,
+                 0px 0px 5px #ffeb3b,
+                 0px 0px 5px #ffeb3b;
+  }
+  body {
+    color: #babdbe;
+    background-color: #263238;
+  }
+  .outcome-table-info-box p{
+    color: #000a12;
+  }
+  p {
+    color: #babdbe;
+  }
+  #subtitle {
+    color: #fff;
+  }
+  .command-table {
+    background-color: #37474f;
+  }
+  .command-content {
+    background-color: #37474f;
+  }
+  .command-invocation p {
+    color: #fff;
+  }
+  .command-stats-table {
+    background-color: #eae399d0;
+    color: #263238;
+  }
+  .command-stats-table p {
+    color: #263238;
+  }
+  .output-box {
+    color: #cfd8dccc;
+    background-color: #102027;
+  }
+  .stage-name p {
+    text-shadow: -1px  0px 0px #263238,
+                 -2px  0px 0px #26323899,
+                 -1px  1px 0px #26323899;
+  }
+  .status-icon-in-progress { fill: #ddd; }
+  .status-icon-in-progress circle { stroke: #ddd; }
+
+  /* SVG graphs */
+  g text {
+    fill: #eceff1;
+    stroke: #fff0;
+  }
+}
+</style>
+</head>
+<body>
+<div id="content">
+
+  <div id="title">
+    <h1>
+      Book Runner pipeline &lsquo;tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs&rsquo;
+    </h1>
+    <p id="subtitle">
+      Litani CI Dashboard
+    </p>
+  </div><!-- id="title" -->
+
+  <div class=run-info>
+    <ul>
+      <li>Pipeline status: success</li>
+      <li>2023-06-01T18:15:14Z</li>
+      <li>3cc8d74e-3670-404b-941a-100aa5cbfe2b</li>
+    </ul>
+  </div><!-- class=run-info -->
+
+  <div id="contents-container">
+
+    <div id="toc">
+      <div class="toc-title">
+        <p>Summary of jobs for this pipeline</p>
+      </div><!-- class="toc-title" -->
+
+      
+        <div class="toc-section">
+          <p>check</p>
+        </div><!-- class="toc-section" -->
+        
+          <div class="toc-row">
+
+            <div class="toc-row-icon">
+              
+                <svg height="16px" width="16px" class="status-icon-tick">
+                  <polygon points="1,11 6,15 15,3 13,1 6,12 3,8"></polygon>
+                </svg>
+              
+            </div><!-- class="toc-row-icon" -->
+
+            <div class="toc-row-job-name">
+              <p>
+              <a href="#job-d6d3dee8-6f84-4251-9697-985eaaed72a8">
+              
+              Is this valid Rust code?
+              
+              </a>
+              </p>
+            </div><!-- class="toc-row-job-name" -->
+
+          </div><!-- class="toc-row" -->
+
+        
+      
+        <div class="toc-section">
+          <p>codegen</p>
+        </div><!-- class="toc-section" -->
+        
+          <div class="toc-row">
+
+            <div class="toc-row-icon">
+              
+                <svg height="16px" width="16px" class="status-icon-tick">
+                  <polygon points="1,11 6,15 15,3 13,1 6,12 3,8"></polygon>
+                </svg>
+              
+            </div><!-- class="toc-row-icon" -->
+
+            <div class="toc-row-job-name">
+              <p>
+              <a href="#job-394e7b28-8436-4ad5-aebc-eba2421b4bc8">
+              
+              Does Kani support all the Rust features used in it?
+              
+              </a>
+              </p>
+            </div><!-- class="toc-row-job-name" -->
+
+          </div><!-- class="toc-row" -->
+
+        
+      
+        <div class="toc-section">
+          <p>verification</p>
+        </div><!-- class="toc-section" -->
+        
+          <div class="toc-row">
+
+            <div class="toc-row-icon">
+              
+                <svg height="16px" width="16px" class="status-icon-tick">
+                  <polygon points="1,11 6,15 15,3 13,1 6,12 3,8"></polygon>
+                </svg>
+              
+            </div><!-- class="toc-row-icon" -->
+
+            <div class="toc-row-job-name">
+              <p>
+              <a href="#job-4c681640-a02c-4f33-b6f7-907e88463535">
+              
+              Can Kani reason about it?
+              
+              </a>
+              </p>
+            </div><!-- class="toc-row-job-name" -->
+
+          </div><!-- class="toc-row" -->
+
+        
+      
+    </div><!-- id="toc" -->
+
+
+    
+
+  </div><!-- id="contents-container" -->
+
+
+  
+  <div class="stage">
+    <div class="stage-name">
+      <p>check</p>
+      <div class="underline"></div>
+    </div><!-- class="stage-name" -->
+
+    
+    <div class="command-table" id="job-d6d3dee8-6f84-4251-9697-985eaaed72a8">
+      
+      <div class="success">
+      
+        <div class="command-content">
+          <div class="command-header">
+            <div class="command-id-link">
+              <p>
+                <a href="#job-d6d3dee8-6f84-4251-9697-985eaaed72a8">#</a>
+              </p>
+            </div><!-- class="command-id-link" -->
+            <div class="command-description">
+              
+              <p>
+                Is this valid Rust code?
+              </p>
+              
+            </div><!-- class="command-description" -->
+          </div><!-- class="command-header" -->
+          <div class="command-invocation">
+            <p>
+            "kani-compiler" "--edition" "2015" "-Z" "no-codegen" "tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs"
+            </p>
+          </div><!-- class="command-invocation" -->
+
+          
+          <div class="command-stats-table">
+            
+            <div class="command-stats-row">
+              <p>Command return code:
+              <span class="value">
+                0
+              </span></p>
+              <p>OK returns:
+              <span class="value">
+                ['0']
+              </span></p>
+              <p>Ignored returns:
+              <span class="value">
+                None
+              </span></p>
+            </div><!-- class="command-stats-row" -->
+            <div class="command-stats-row">
+              <p>Timeout:
+              <span class="value">
+                5
+              </span></p>
+              <p>Timeout ok:
+              <span class="value">
+                False
+              </span></p>
+              <p>Timeout ignored:
+              <span class="value">
+                False
+              </span></p>
+              <p>Timeout reached:
+              <span class="value">
+                False
+              </span></p>
+            </div><!-- class="command-stats-row" -->
+            <div class="command-stats-row">
+              <p>Start time:
+              <span class="value">
+                2023-06-01T18:18:42Z
+              </span></p>
+              <p>Duration:
+              <span class="value">
+                00s
+              </span></p>
+              <p>End time:
+              <span class="value">
+                2023-06-01T18:18:42Z
+              </span></p>
+            </div><!-- class="command-stats-row" -->
+            <div class="command-stats-row">
+              <p>Command successful:
+              <span class="value">
+              
+              yes
+              
+              </span></p>
+            </div><!-- class="command-stats-row" -->
+             
+          </div><!-- class="command-stats-table" -->
+          
+
+          
+
+
+          
+
+
+          
+
+          
+
+        </div><!-- class="command-content" -->
+      </div><!-- class="fail" -->
+    </div><!-- id="command-table" -->
+    
+
+  </div><!-- class="stage" -->
+  
+  <div class="stage">
+    <div class="stage-name">
+      <p>codegen</p>
+      <div class="underline"></div>
+    </div><!-- class="stage-name" -->
+
+    
+    <div class="command-table" id="job-394e7b28-8436-4ad5-aebc-eba2421b4bc8">
+      
+      <div class="success">
+      
+        <div class="command-content">
+          <div class="command-header">
+            <div class="command-id-link">
+              <p>
+                <a href="#job-394e7b28-8436-4ad5-aebc-eba2421b4bc8">#</a>
+              </p>
+            </div><!-- class="command-id-link" -->
+            <div class="command-description">
+              
+              <p>
+                Does Kani support all the Rust features used in it?
+              </p>
+              
+            </div><!-- class="command-description" -->
+          </div><!-- class="command-header" -->
+          <div class="command-invocation">
+            <p>
+            "kani-compiler" "--edition" "2015" "--out-dir" "build/tmp" "tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs"
+            </p>
+          </div><!-- class="command-invocation" -->
+
+          
+          <div class="command-stats-table">
+            
+            <div class="command-stats-row">
+              <p>Command return code:
+              <span class="value">
+                0
+              </span></p>
+              <p>OK returns:
+              <span class="value">
+                ['0']
+              </span></p>
+              <p>Ignored returns:
+              <span class="value">
+                None
+              </span></p>
+            </div><!-- class="command-stats-row" -->
+            <div class="command-stats-row">
+              <p>Timeout:
+              <span class="value">
+                10
+              </span></p>
+              <p>Timeout ok:
+              <span class="value">
+                False
+              </span></p>
+              <p>Timeout ignored:
+              <span class="value">
+                False
+              </span></p>
+              <p>Timeout reached:
+              <span class="value">
+                False
+              </span></p>
+            </div><!-- class="command-stats-row" -->
+            <div class="command-stats-row">
+              <p>Start time:
+              <span class="value">
+                2023-06-01T18:19:34Z
+              </span></p>
+              <p>Duration:
+              <span class="value">
+                00s
+              </span></p>
+              <p>End time:
+              <span class="value">
+                2023-06-01T18:19:34Z
+              </span></p>
+            </div><!-- class="command-stats-row" -->
+            <div class="command-stats-row">
+              <p>Command successful:
+              <span class="value">
+              
+              yes
+              
+              </span></p>
+            </div><!-- class="command-stats-row" -->
+             
+          </div><!-- class="command-stats-table" -->
+          
+
+          
+
+
+          
+
+
+          
+
+          
+
+        </div><!-- class="command-content" -->
+      </div><!-- class="fail" -->
+    </div><!-- id="command-table" -->
+    
+
+  </div><!-- class="stage" -->
+  
+  <div class="stage">
+    <div class="stage-name">
+      <p>verification</p>
+      <div class="underline"></div>
+    </div><!-- class="stage-name" -->
+
+    
+    <div class="command-table" id="job-4c681640-a02c-4f33-b6f7-907e88463535">
+      
+      <div class="success">
+      
+        <div class="command-content">
+          <div class="command-header">
+            <div class="command-id-link">
+              <p>
+                <a href="#job-4c681640-a02c-4f33-b6f7-907e88463535">#</a>
+              </p>
+            </div><!-- class="command-id-link" -->
+            <div class="command-description">
+              
+              <p>
+                Can Kani reason about it?
+              </p>
+              
+            </div><!-- class="command-description" -->
+          </div><!-- class="command-header" -->
+          <div class="command-invocation">
+            <p>
+            RUSTFLAGS="--edition 2015" RUSTFLAGS="--edition 2015" "kani" "tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs" "--enable-unstable" "--function" "main"
+            </p>
+          </div><!-- class="command-invocation" -->
+
+          
+          <div class="command-stats-table">
+            
+            <div class="command-stats-row">
+              <p>Command return code:
+              <span class="value">
+                0
+              </span></p>
+              <p>OK returns:
+              <span class="value">
+                ['0']
+              </span></p>
+              <p>Ignored returns:
+              <span class="value">
+                None
+              </span></p>
+            </div><!-- class="command-stats-row" -->
+            <div class="command-stats-row">
+              <p>Timeout:
+              <span class="value">
+                60
+              </span></p>
+              <p>Timeout ok:
+              <span class="value">
+                False
+              </span></p>
+              <p>Timeout ignored:
+              <span class="value">
+                False
+              </span></p>
+              <p>Timeout reached:
+              <span class="value">
+                False
+              </span></p>
+            </div><!-- class="command-stats-row" -->
+            <div class="command-stats-row">
+              <p>Start time:
+              <span class="value">
+                2023-06-01T18:19:41Z
+              </span></p>
+              <p>Duration:
+              <span class="value">
+                12s
+              </span></p>
+              <p>End time:
+              <span class="value">
+                2023-06-01T18:19:53Z
+              </span></p>
+            </div><!-- class="command-stats-row" -->
+            <div class="command-stats-row">
+              <p>Command successful:
+              <span class="value">
+              
+              yes
+              
+              </span></p>
+            </div><!-- class="command-stats-row" -->
+             
+          </div><!-- class="command-stats-table" -->
+          
+
+          
+
+
+          
+
+
+          
+            
+            <div class="output-box"><xmp>stdout:
+              
+Checking harness main...
+CBMC 5.84.0 (cbmc-5.84.0)
+CBMC version 5.84.0 (cbmc-5.84.0) 64-bit x86_64 linux
+Reading GOTO program from file /home/runner/work/kani/kani/tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.out
+Generating GOTO Program
+Adding CPROVER library (x86_64)
+Removal of function pointers and virtual functions
+Generic Property Instrumentation
+Running with 16 object bits, 48 offset bits (user-specified)
+Starting Bounded Model Checking
+Unwinding loop main.0 iteration 1 file /home/runner/work/kani/kani/tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs line 22 column 16 function main thread 0
+Unwinding loop main.0 iteration 2 file /home/runner/work/kani/kani/tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs line 22 column 16 function main thread 0
+Unwinding loop main.0 iteration 3 file /home/runner/work/kani/kani/tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs line 22 column 16 function main thread 0
+Unwinding loop main.0 iteration 4 file /home/runner/work/kani/kani/tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs line 22 column 16 function main thread 0
+Unwinding loop main.0 iteration 5 file /home/runner/work/kani/kani/tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs line 22 column 16 function main thread 0
+Unwinding loop main.0 iteration 6 file /home/runner/work/kani/kani/tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs line 22 column 16 function main thread 0
+Unwinding loop main.0 iteration 7 file /home/runner/work/kani/kani/tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs line 22 column 16 function main thread 0
+Unwinding loop main.0 iteration 8 file /home/runner/work/kani/kani/tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs line 22 column 16 function main thread 0
+Unwinding loop main.0 iteration 9 file /home/runner/work/kani/kani/tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs line 22 column 16 function main thread 0
+Unwinding loop main.0 iteration 10 file /home/runner/work/kani/kani/tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs line 22 column 16 function main thread 0
+Unwinding loop main.0 iteration 11 file /home/runner/work/kani/kani/tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs line 22 column 16 function main thread 0
+Unwinding loop main.0 iteration 12 file /home/runner/work/kani/kani/tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs line 22 column 16 function main thread 0
+Unwinding loop main.0 iteration 13 file /home/runner/work/kani/kani/tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs line 22 column 16 function main thread 0
+Unwinding loop main.0 iteration 14 file /home/runner/work/kani/kani/tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs line 22 column 16 function main thread 0
+Unwinding loop main.0 iteration 15 file /home/runner/work/kani/kani/tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs line 22 column 16 function main thread 0
+Unwinding loop main.0 iteration 16 file /home/runner/work/kani/kani/tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs line 22 column 16 function main thread 0
+Unwinding loop main.0 iteration 17 file /home/runner/work/kani/kani/tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs line 22 column 16 function main thread 0
+Unwinding loop main.0 iteration 18 file /home/runner/work/kani/kani/tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs line 22 column 16 function main thread 0
+Unwinding loop main.0 iteration 19 file /home/runner/work/kani/kani/tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs line 22 column 16 function main thread 0
+Unwinding loop main.0 iteration 20 file /home/runner/work/kani/kani/tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs line 22 column 16 function main thread 0
+Unwinding loop main.0 iteration 21 file /home/runner/work/kani/kani/tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs line 22 column 16 function main thread 0
+Unwinding loop main.0 iteration 22 file /home/runner/work/kani/kani/tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs line 22 column 16 function main thread 0
+Unwinding loop main.0 iteration 23 file /home/runner/work/kani/kani/tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs line 22 column 16 function main thread 0
+Unwinding loop main.0 iteration 24 file /home/runner/work/kani/kani/tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs line 22 column 16 function main thread 0
+Unwinding loop main.0 iteration 25 file /home/runner/work/kani/kani/tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs line 22 column 16 function main thread 0
+Unwinding loop main.0 iteration 26 file /home/runner/work/kani/kani/tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs line 22 column 16 function main thread 0
+Unwinding loop main.0 iteration 27 file /home/runner/work/kani/kani/tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs line 22 column 16 function main thread 0
+Unwinding loop main.0 iteration 28 file /home/runner/work/kani/kani/tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs line 22 column 16 function main thread 0
+Unwinding loop main.0 iteration 29 file /home/runner/work/kani/kani/tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs line 22 column 16 function main thread 0
+Unwinding loop main.0 iteration 30 file /home/runner/work/kani/kani/tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs line 22 column 16 function main thread 0
+Unwinding loop main.0 iteration 31 file /home/runner/work/kani/kani/tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs line 22 column 16 function main thread 0
+Unwinding loop main.0 iteration 32 file /home/runner/work/kani/kani/tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs line 22 column 16 function main thread 0
+Unwinding loop _RINvYINtNtNtCsi36QqhwMYzx_4core3ops5range9RangeFrommENtNtNtNtBa_4iter6traits8iterator8Iterator8try_foldmNCINvNtNtBV_8adapters3map12map_try_foldmmmINtNtB8_12control_flow11ControlFlowINtNtB8_9try_trait17NeverShortCircuitmEmENCNvCs66mF7N4XItJ_1_74main0NCINvNvXs0_NtB1L_10take_whileINtB4a_9TakeWhileppEBP_8try_fold5checkmmB2T_NCB3A_s_0NCINvMB2W_B2T_10wrap_mut_2mmNCINvNtB1L_6filter11filter_foldmmNCB3A_s0_0NCB3A_s1_0E0E0E0E0B2k_EB3C_.0 iteration 1 file /home/runner/.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/traits/iterator.rs line 2302 column 9 function <std::ops::RangeFrom<u32> as std::iter::Iterator>::try_fold::<u32, [closure@std::iter::adapters::map::map_try_fold<'_, u32, u32, u32, std::ops::ControlFlow<std::ops::try_trait::NeverShortCircuit<u32>, u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:31:19: 31:22], [closure@<std::iter::TakeWhile<I, P> as std::iter::Iterator>::try_fold::check<'_, u32, u32, std::ops::try_trait::NeverShortCircuit<u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:26: 32:38], [closure@std::ops::try_trait::NeverShortCircuit<u32>::wrap_mut_2<u32, u32, [closure@std::iter::adapters::filter::filter_fold<u32, u32, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:22: 33:34], [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:34:23: 34:39]>::{closure#0}]>::{closure#0}]>::{closure#0}]>::{closure#0}], std::ops::ControlFlow<std::ops::try_trait::NeverShortCircuit<u32>, u32>> thread 0
+Unwinding loop _RINvYINtNtNtCsi36QqhwMYzx_4core3ops5range9RangeFrommENtNtNtNtBa_4iter6traits8iterator8Iterator8try_foldmNCINvNtNtBV_8adapters3map12map_try_foldmmmINtNtB8_12control_flow11ControlFlowINtNtB8_9try_trait17NeverShortCircuitmEmENCNvCs66mF7N4XItJ_1_74main0NCINvNvXs0_NtB1L_10take_whileINtB4a_9TakeWhileppEBP_8try_fold5checkmmB2T_NCB3A_s_0NCINvMB2W_B2T_10wrap_mut_2mmNCINvNtB1L_6filter11filter_foldmmNCB3A_s0_0NCB3A_s1_0E0E0E0E0B2k_EB3C_.0 iteration 2 file /home/runner/.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/traits/iterator.rs line 2302 column 9 function <std::ops::RangeFrom<u32> as std::iter::Iterator>::try_fold::<u32, [closure@std::iter::adapters::map::map_try_fold<'_, u32, u32, u32, std::ops::ControlFlow<std::ops::try_trait::NeverShortCircuit<u32>, u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:31:19: 31:22], [closure@<std::iter::TakeWhile<I, P> as std::iter::Iterator>::try_fold::check<'_, u32, u32, std::ops::try_trait::NeverShortCircuit<u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:26: 32:38], [closure@std::ops::try_trait::NeverShortCircuit<u32>::wrap_mut_2<u32, u32, [closure@std::iter::adapters::filter::filter_fold<u32, u32, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:22: 33:34], [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:34:23: 34:39]>::{closure#0}]>::{closure#0}]>::{closure#0}]>::{closure#0}], std::ops::ControlFlow<std::ops::try_trait::NeverShortCircuit<u32>, u32>> thread 0
+Unwinding loop _RINvYINtNtNtCsi36QqhwMYzx_4core3ops5range9RangeFrommENtNtNtNtBa_4iter6traits8iterator8Iterator8try_foldmNCINvNtNtBV_8adapters3map12map_try_foldmmmINtNtB8_12control_flow11ControlFlowINtNtB8_9try_trait17NeverShortCircuitmEmENCNvCs66mF7N4XItJ_1_74main0NCINvNvXs0_NtB1L_10take_whileINtB4a_9TakeWhileppEBP_8try_fold5checkmmB2T_NCB3A_s_0NCINvMB2W_B2T_10wrap_mut_2mmNCINvNtB1L_6filter11filter_foldmmNCB3A_s0_0NCB3A_s1_0E0E0E0E0B2k_EB3C_.0 iteration 3 file /home/runner/.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/traits/iterator.rs line 2302 column 9 function <std::ops::RangeFrom<u32> as std::iter::Iterator>::try_fold::<u32, [closure@std::iter::adapters::map::map_try_fold<'_, u32, u32, u32, std::ops::ControlFlow<std::ops::try_trait::NeverShortCircuit<u32>, u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:31:19: 31:22], [closure@<std::iter::TakeWhile<I, P> as std::iter::Iterator>::try_fold::check<'_, u32, u32, std::ops::try_trait::NeverShortCircuit<u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:26: 32:38], [closure@std::ops::try_trait::NeverShortCircuit<u32>::wrap_mut_2<u32, u32, [closure@std::iter::adapters::filter::filter_fold<u32, u32, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:22: 33:34], [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:34:23: 34:39]>::{closure#0}]>::{closure#0}]>::{closure#0}]>::{closure#0}], std::ops::ControlFlow<std::ops::try_trait::NeverShortCircuit<u32>, u32>> thread 0
+Unwinding loop _RINvYINtNtNtCsi36QqhwMYzx_4core3ops5range9RangeFrommENtNtNtNtBa_4iter6traits8iterator8Iterator8try_foldmNCINvNtNtBV_8adapters3map12map_try_foldmmmINtNtB8_12control_flow11ControlFlowINtNtB8_9try_trait17NeverShortCircuitmEmENCNvCs66mF7N4XItJ_1_74main0NCINvNvXs0_NtB1L_10take_whileINtB4a_9TakeWhileppEBP_8try_fold5checkmmB2T_NCB3A_s_0NCINvMB2W_B2T_10wrap_mut_2mmNCINvNtB1L_6filter11filter_foldmmNCB3A_s0_0NCB3A_s1_0E0E0E0E0B2k_EB3C_.0 iteration 4 file /home/runner/.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/traits/iterator.rs line 2302 column 9 function <std::ops::RangeFrom<u32> as std::iter::Iterator>::try_fold::<u32, [closure@std::iter::adapters::map::map_try_fold<'_, u32, u32, u32, std::ops::ControlFlow<std::ops::try_trait::NeverShortCircuit<u32>, u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:31:19: 31:22], [closure@<std::iter::TakeWhile<I, P> as std::iter::Iterator>::try_fold::check<'_, u32, u32, std::ops::try_trait::NeverShortCircuit<u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:26: 32:38], [closure@std::ops::try_trait::NeverShortCircuit<u32>::wrap_mut_2<u32, u32, [closure@std::iter::adapters::filter::filter_fold<u32, u32, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:22: 33:34], [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:34:23: 34:39]>::{closure#0}]>::{closure#0}]>::{closure#0}]>::{closure#0}], std::ops::ControlFlow<std::ops::try_trait::NeverShortCircuit<u32>, u32>> thread 0
+Unwinding loop _RINvYINtNtNtCsi36QqhwMYzx_4core3ops5range9RangeFrommENtNtNtNtBa_4iter6traits8iterator8Iterator8try_foldmNCINvNtNtBV_8adapters3map12map_try_foldmmmINtNtB8_12control_flow11ControlFlowINtNtB8_9try_trait17NeverShortCircuitmEmENCNvCs66mF7N4XItJ_1_74main0NCINvNvXs0_NtB1L_10take_whileINtB4a_9TakeWhileppEBP_8try_fold5checkmmB2T_NCB3A_s_0NCINvMB2W_B2T_10wrap_mut_2mmNCINvNtB1L_6filter11filter_foldmmNCB3A_s0_0NCB3A_s1_0E0E0E0E0B2k_EB3C_.0 iteration 5 file /home/runner/.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/traits/iterator.rs line 2302 column 9 function <std::ops::RangeFrom<u32> as std::iter::Iterator>::try_fold::<u32, [closure@std::iter::adapters::map::map_try_fold<'_, u32, u32, u32, std::ops::ControlFlow<std::ops::try_trait::NeverShortCircuit<u32>, u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:31:19: 31:22], [closure@<std::iter::TakeWhile<I, P> as std::iter::Iterator>::try_fold::check<'_, u32, u32, std::ops::try_trait::NeverShortCircuit<u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:26: 32:38], [closure@std::ops::try_trait::NeverShortCircuit<u32>::wrap_mut_2<u32, u32, [closure@std::iter::adapters::filter::filter_fold<u32, u32, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:22: 33:34], [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:34:23: 34:39]>::{closure#0}]>::{closure#0}]>::{closure#0}]>::{closure#0}], std::ops::ControlFlow<std::ops::try_trait::NeverShortCircuit<u32>, u32>> thread 0
+Unwinding loop _RINvYINtNtNtCsi36QqhwMYzx_4core3ops5range9RangeFrommENtNtNtNtBa_4iter6traits8iterator8Iterator8try_foldmNCINvNtNtBV_8adapters3map12map_try_foldmmmINtNtB8_12control_flow11ControlFlowINtNtB8_9try_trait17NeverShortCircuitmEmENCNvCs66mF7N4XItJ_1_74main0NCINvNvXs0_NtB1L_10take_whileINtB4a_9TakeWhileppEBP_8try_fold5checkmmB2T_NCB3A_s_0NCINvMB2W_B2T_10wrap_mut_2mmNCINvNtB1L_6filter11filter_foldmmNCB3A_s0_0NCB3A_s1_0E0E0E0E0B2k_EB3C_.0 iteration 6 file /home/runner/.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/traits/iterator.rs line 2302 column 9 function <std::ops::RangeFrom<u32> as std::iter::Iterator>::try_fold::<u32, [closure@std::iter::adapters::map::map_try_fold<'_, u32, u32, u32, std::ops::ControlFlow<std::ops::try_trait::NeverShortCircuit<u32>, u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:31:19: 31:22], [closure@<std::iter::TakeWhile<I, P> as std::iter::Iterator>::try_fold::check<'_, u32, u32, std::ops::try_trait::NeverShortCircuit<u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:26: 32:38], [closure@std::ops::try_trait::NeverShortCircuit<u32>::wrap_mut_2<u32, u32, [closure@std::iter::adapters::filter::filter_fold<u32, u32, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:22: 33:34], [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:34:23: 34:39]>::{closure#0}]>::{closure#0}]>::{closure#0}]>::{closure#0}], std::ops::ControlFlow<std::ops::try_trait::NeverShortCircuit<u32>, u32>> thread 0
+Unwinding loop _RINvYINtNtNtCsi36QqhwMYzx_4core3ops5range9RangeFrommENtNtNtNtBa_4iter6traits8iterator8Iterator8try_foldmNCINvNtNtBV_8adapters3map12map_try_foldmmmINtNtB8_12control_flow11ControlFlowINtNtB8_9try_trait17NeverShortCircuitmEmENCNvCs66mF7N4XItJ_1_74main0NCINvNvXs0_NtB1L_10take_whileINtB4a_9TakeWhileppEBP_8try_fold5checkmmB2T_NCB3A_s_0NCINvMB2W_B2T_10wrap_mut_2mmNCINvNtB1L_6filter11filter_foldmmNCB3A_s0_0NCB3A_s1_0E0E0E0E0B2k_EB3C_.0 iteration 7 file /home/runner/.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/traits/iterator.rs line 2302 column 9 function <std::ops::RangeFrom<u32> as std::iter::Iterator>::try_fold::<u32, [closure@std::iter::adapters::map::map_try_fold<'_, u32, u32, u32, std::ops::ControlFlow<std::ops::try_trait::NeverShortCircuit<u32>, u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:31:19: 31:22], [closure@<std::iter::TakeWhile<I, P> as std::iter::Iterator>::try_fold::check<'_, u32, u32, std::ops::try_trait::NeverShortCircuit<u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:26: 32:38], [closure@std::ops::try_trait::NeverShortCircuit<u32>::wrap_mut_2<u32, u32, [closure@std::iter::adapters::filter::filter_fold<u32, u32, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:22: 33:34], [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:34:23: 34:39]>::{closure#0}]>::{closure#0}]>::{closure#0}]>::{closure#0}], std::ops::ControlFlow<std::ops::try_trait::NeverShortCircuit<u32>, u32>> thread 0
+Unwinding loop _RINvYINtNtNtCsi36QqhwMYzx_4core3ops5range9RangeFrommENtNtNtNtBa_4iter6traits8iterator8Iterator8try_foldmNCINvNtNtBV_8adapters3map12map_try_foldmmmINtNtB8_12control_flow11ControlFlowINtNtB8_9try_trait17NeverShortCircuitmEmENCNvCs66mF7N4XItJ_1_74main0NCINvNvXs0_NtB1L_10take_whileINtB4a_9TakeWhileppEBP_8try_fold5checkmmB2T_NCB3A_s_0NCINvMB2W_B2T_10wrap_mut_2mmNCINvNtB1L_6filter11filter_foldmmNCB3A_s0_0NCB3A_s1_0E0E0E0E0B2k_EB3C_.0 iteration 8 file /home/runner/.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/traits/iterator.rs line 2302 column 9 function <std::ops::RangeFrom<u32> as std::iter::Iterator>::try_fold::<u32, [closure@std::iter::adapters::map::map_try_fold<'_, u32, u32, u32, std::ops::ControlFlow<std::ops::try_trait::NeverShortCircuit<u32>, u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:31:19: 31:22], [closure@<std::iter::TakeWhile<I, P> as std::iter::Iterator>::try_fold::check<'_, u32, u32, std::ops::try_trait::NeverShortCircuit<u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:26: 32:38], [closure@std::ops::try_trait::NeverShortCircuit<u32>::wrap_mut_2<u32, u32, [closure@std::iter::adapters::filter::filter_fold<u32, u32, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:22: 33:34], [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:34:23: 34:39]>::{closure#0}]>::{closure#0}]>::{closure#0}]>::{closure#0}], std::ops::ControlFlow<std::ops::try_trait::NeverShortCircuit<u32>, u32>> thread 0
+Unwinding loop _RINvYINtNtNtCsi36QqhwMYzx_4core3ops5range9RangeFrommENtNtNtNtBa_4iter6traits8iterator8Iterator8try_foldmNCINvNtNtBV_8adapters3map12map_try_foldmmmINtNtB8_12control_flow11ControlFlowINtNtB8_9try_trait17NeverShortCircuitmEmENCNvCs66mF7N4XItJ_1_74main0NCINvNvXs0_NtB1L_10take_whileINtB4a_9TakeWhileppEBP_8try_fold5checkmmB2T_NCB3A_s_0NCINvMB2W_B2T_10wrap_mut_2mmNCINvNtB1L_6filter11filter_foldmmNCB3A_s0_0NCB3A_s1_0E0E0E0E0B2k_EB3C_.0 iteration 9 file /home/runner/.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/traits/iterator.rs line 2302 column 9 function <std::ops::RangeFrom<u32> as std::iter::Iterator>::try_fold::<u32, [closure@std::iter::adapters::map::map_try_fold<'_, u32, u32, u32, std::ops::ControlFlow<std::ops::try_trait::NeverShortCircuit<u32>, u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:31:19: 31:22], [closure@<std::iter::TakeWhile<I, P> as std::iter::Iterator>::try_fold::check<'_, u32, u32, std::ops::try_trait::NeverShortCircuit<u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:26: 32:38], [closure@std::ops::try_trait::NeverShortCircuit<u32>::wrap_mut_2<u32, u32, [closure@std::iter::adapters::filter::filter_fold<u32, u32, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:22: 33:34], [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:34:23: 34:39]>::{closure#0}]>::{closure#0}]>::{closure#0}]>::{closure#0}], std::ops::ControlFlow<std::ops::try_trait::NeverShortCircuit<u32>, u32>> thread 0
+Unwinding loop _RINvYINtNtNtCsi36QqhwMYzx_4core3ops5range9RangeFrommENtNtNtNtBa_4iter6traits8iterator8Iterator8try_foldmNCINvNtNtBV_8adapters3map12map_try_foldmmmINtNtB8_12control_flow11ControlFlowINtNtB8_9try_trait17NeverShortCircuitmEmENCNvCs66mF7N4XItJ_1_74main0NCINvNvXs0_NtB1L_10take_whileINtB4a_9TakeWhileppEBP_8try_fold5checkmmB2T_NCB3A_s_0NCINvMB2W_B2T_10wrap_mut_2mmNCINvNtB1L_6filter11filter_foldmmNCB3A_s0_0NCB3A_s1_0E0E0E0E0B2k_EB3C_.0 iteration 10 file /home/runner/.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/traits/iterator.rs line 2302 column 9 function <std::ops::RangeFrom<u32> as std::iter::Iterator>::try_fold::<u32, [closure@std::iter::adapters::map::map_try_fold<'_, u32, u32, u32, std::ops::ControlFlow<std::ops::try_trait::NeverShortCircuit<u32>, u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:31:19: 31:22], [closure@<std::iter::TakeWhile<I, P> as std::iter::Iterator>::try_fold::check<'_, u32, u32, std::ops::try_trait::NeverShortCircuit<u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:26: 32:38], [closure@std::ops::try_trait::NeverShortCircuit<u32>::wrap_mut_2<u32, u32, [closure@std::iter::adapters::filter::filter_fold<u32, u32, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:22: 33:34], [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:34:23: 34:39]>::{closure#0}]>::{closure#0}]>::{closure#0}]>::{closure#0}], std::ops::ControlFlow<std::ops::try_trait::NeverShortCircuit<u32>, u32>> thread 0
+Unwinding loop _RINvYINtNtNtCsi36QqhwMYzx_4core3ops5range9RangeFrommENtNtNtNtBa_4iter6traits8iterator8Iterator8try_foldmNCINvNtNtBV_8adapters3map12map_try_foldmmmINtNtB8_12control_flow11ControlFlowINtNtB8_9try_trait17NeverShortCircuitmEmENCNvCs66mF7N4XItJ_1_74main0NCINvNvXs0_NtB1L_10take_whileINtB4a_9TakeWhileppEBP_8try_fold5checkmmB2T_NCB3A_s_0NCINvMB2W_B2T_10wrap_mut_2mmNCINvNtB1L_6filter11filter_foldmmNCB3A_s0_0NCB3A_s1_0E0E0E0E0B2k_EB3C_.0 iteration 11 file /home/runner/.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/traits/iterator.rs line 2302 column 9 function <std::ops::RangeFrom<u32> as std::iter::Iterator>::try_fold::<u32, [closure@std::iter::adapters::map::map_try_fold<'_, u32, u32, u32, std::ops::ControlFlow<std::ops::try_trait::NeverShortCircuit<u32>, u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:31:19: 31:22], [closure@<std::iter::TakeWhile<I, P> as std::iter::Iterator>::try_fold::check<'_, u32, u32, std::ops::try_trait::NeverShortCircuit<u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:26: 32:38], [closure@std::ops::try_trait::NeverShortCircuit<u32>::wrap_mut_2<u32, u32, [closure@std::iter::adapters::filter::filter_fold<u32, u32, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:22: 33:34], [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:34:23: 34:39]>::{closure#0}]>::{closure#0}]>::{closure#0}]>::{closure#0}], std::ops::ControlFlow<std::ops::try_trait::NeverShortCircuit<u32>, u32>> thread 0
+Unwinding loop _RINvYINtNtNtCsi36QqhwMYzx_4core3ops5range9RangeFrommENtNtNtNtBa_4iter6traits8iterator8Iterator8try_foldmNCINvNtNtBV_8adapters3map12map_try_foldmmmINtNtB8_12control_flow11ControlFlowINtNtB8_9try_trait17NeverShortCircuitmEmENCNvCs66mF7N4XItJ_1_74main0NCINvNvXs0_NtB1L_10take_whileINtB4a_9TakeWhileppEBP_8try_fold5checkmmB2T_NCB3A_s_0NCINvMB2W_B2T_10wrap_mut_2mmNCINvNtB1L_6filter11filter_foldmmNCB3A_s0_0NCB3A_s1_0E0E0E0E0B2k_EB3C_.0 iteration 12 file /home/runner/.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/traits/iterator.rs line 2302 column 9 function <std::ops::RangeFrom<u32> as std::iter::Iterator>::try_fold::<u32, [closure@std::iter::adapters::map::map_try_fold<'_, u32, u32, u32, std::ops::ControlFlow<std::ops::try_trait::NeverShortCircuit<u32>, u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:31:19: 31:22], [closure@<std::iter::TakeWhile<I, P> as std::iter::Iterator>::try_fold::check<'_, u32, u32, std::ops::try_trait::NeverShortCircuit<u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:26: 32:38], [closure@std::ops::try_trait::NeverShortCircuit<u32>::wrap_mut_2<u32, u32, [closure@std::iter::adapters::filter::filter_fold<u32, u32, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:22: 33:34], [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:34:23: 34:39]>::{closure#0}]>::{closure#0}]>::{closure#0}]>::{closure#0}], std::ops::ControlFlow<std::ops::try_trait::NeverShortCircuit<u32>, u32>> thread 0
+Unwinding loop _RINvYINtNtNtCsi36QqhwMYzx_4core3ops5range9RangeFrommENtNtNtNtBa_4iter6traits8iterator8Iterator8try_foldmNCINvNtNtBV_8adapters3map12map_try_foldmmmINtNtB8_12control_flow11ControlFlowINtNtB8_9try_trait17NeverShortCircuitmEmENCNvCs66mF7N4XItJ_1_74main0NCINvNvXs0_NtB1L_10take_whileINtB4a_9TakeWhileppEBP_8try_fold5checkmmB2T_NCB3A_s_0NCINvMB2W_B2T_10wrap_mut_2mmNCINvNtB1L_6filter11filter_foldmmNCB3A_s0_0NCB3A_s1_0E0E0E0E0B2k_EB3C_.0 iteration 13 file /home/runner/.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/traits/iterator.rs line 2302 column 9 function <std::ops::RangeFrom<u32> as std::iter::Iterator>::try_fold::<u32, [closure@std::iter::adapters::map::map_try_fold<'_, u32, u32, u32, std::ops::ControlFlow<std::ops::try_trait::NeverShortCircuit<u32>, u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:31:19: 31:22], [closure@<std::iter::TakeWhile<I, P> as std::iter::Iterator>::try_fold::check<'_, u32, u32, std::ops::try_trait::NeverShortCircuit<u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:26: 32:38], [closure@std::ops::try_trait::NeverShortCircuit<u32>::wrap_mut_2<u32, u32, [closure@std::iter::adapters::filter::filter_fold<u32, u32, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:22: 33:34], [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:34:23: 34:39]>::{closure#0}]>::{closure#0}]>::{closure#0}]>::{closure#0}], std::ops::ControlFlow<std::ops::try_trait::NeverShortCircuit<u32>, u32>> thread 0
+Unwinding loop _RINvYINtNtNtCsi36QqhwMYzx_4core3ops5range9RangeFrommENtNtNtNtBa_4iter6traits8iterator8Iterator8try_foldmNCINvNtNtBV_8adapters3map12map_try_foldmmmINtNtB8_12control_flow11ControlFlowINtNtB8_9try_trait17NeverShortCircuitmEmENCNvCs66mF7N4XItJ_1_74main0NCINvNvXs0_NtB1L_10take_whileINtB4a_9TakeWhileppEBP_8try_fold5checkmmB2T_NCB3A_s_0NCINvMB2W_B2T_10wrap_mut_2mmNCINvNtB1L_6filter11filter_foldmmNCB3A_s0_0NCB3A_s1_0E0E0E0E0B2k_EB3C_.0 iteration 14 file /home/runner/.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/traits/iterator.rs line 2302 column 9 function <std::ops::RangeFrom<u32> as std::iter::Iterator>::try_fold::<u32, [closure@std::iter::adapters::map::map_try_fold<'_, u32, u32, u32, std::ops::ControlFlow<std::ops::try_trait::NeverShortCircuit<u32>, u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:31:19: 31:22], [closure@<std::iter::TakeWhile<I, P> as std::iter::Iterator>::try_fold::check<'_, u32, u32, std::ops::try_trait::NeverShortCircuit<u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:26: 32:38], [closure@std::ops::try_trait::NeverShortCircuit<u32>::wrap_mut_2<u32, u32, [closure@std::iter::adapters::filter::filter_fold<u32, u32, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:22: 33:34], [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:34:23: 34:39]>::{closure#0}]>::{closure#0}]>::{closure#0}]>::{closure#0}], std::ops::ControlFlow<std::ops::try_trait::NeverShortCircuit<u32>, u32>> thread 0
+Unwinding loop _RINvYINtNtNtCsi36QqhwMYzx_4core3ops5range9RangeFrommENtNtNtNtBa_4iter6traits8iterator8Iterator8try_foldmNCINvNtNtBV_8adapters3map12map_try_foldmmmINtNtB8_12control_flow11ControlFlowINtNtB8_9try_trait17NeverShortCircuitmEmENCNvCs66mF7N4XItJ_1_74main0NCINvNvXs0_NtB1L_10take_whileINtB4a_9TakeWhileppEBP_8try_fold5checkmmB2T_NCB3A_s_0NCINvMB2W_B2T_10wrap_mut_2mmNCINvNtB1L_6filter11filter_foldmmNCB3A_s0_0NCB3A_s1_0E0E0E0E0B2k_EB3C_.0 iteration 15 file /home/runner/.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/traits/iterator.rs line 2302 column 9 function <std::ops::RangeFrom<u32> as std::iter::Iterator>::try_fold::<u32, [closure@std::iter::adapters::map::map_try_fold<'_, u32, u32, u32, std::ops::ControlFlow<std::ops::try_trait::NeverShortCircuit<u32>, u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:31:19: 31:22], [closure@<std::iter::TakeWhile<I, P> as std::iter::Iterator>::try_fold::check<'_, u32, u32, std::ops::try_trait::NeverShortCircuit<u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:26: 32:38], [closure@std::ops::try_trait::NeverShortCircuit<u32>::wrap_mut_2<u32, u32, [closure@std::iter::adapters::filter::filter_fold<u32, u32, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:22: 33:34], [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:34:23: 34:39]>::{closure#0}]>::{closure#0}]>::{closure#0}]>::{closure#0}], std::ops::ControlFlow<std::ops::try_trait::NeverShortCircuit<u32>, u32>> thread 0
+Unwinding loop _RINvYINtNtNtCsi36QqhwMYzx_4core3ops5range9RangeFrommENtNtNtNtBa_4iter6traits8iterator8Iterator8try_foldmNCINvNtNtBV_8adapters3map12map_try_foldmmmINtNtB8_12control_flow11ControlFlowINtNtB8_9try_trait17NeverShortCircuitmEmENCNvCs66mF7N4XItJ_1_74main0NCINvNvXs0_NtB1L_10take_whileINtB4a_9TakeWhileppEBP_8try_fold5checkmmB2T_NCB3A_s_0NCINvMB2W_B2T_10wrap_mut_2mmNCINvNtB1L_6filter11filter_foldmmNCB3A_s0_0NCB3A_s1_0E0E0E0E0B2k_EB3C_.0 iteration 16 file /home/runner/.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/traits/iterator.rs line 2302 column 9 function <std::ops::RangeFrom<u32> as std::iter::Iterator>::try_fold::<u32, [closure@std::iter::adapters::map::map_try_fold<'_, u32, u32, u32, std::ops::ControlFlow<std::ops::try_trait::NeverShortCircuit<u32>, u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:31:19: 31:22], [closure@<std::iter::TakeWhile<I, P> as std::iter::Iterator>::try_fold::check<'_, u32, u32, std::ops::try_trait::NeverShortCircuit<u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:26: 32:38], [closure@std::ops::try_trait::NeverShortCircuit<u32>::wrap_mut_2<u32, u32, [closure@std::iter::adapters::filter::filter_fold<u32, u32, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:22: 33:34], [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:34:23: 34:39]>::{closure#0}]>::{closure#0}]>::{closure#0}]>::{closure#0}], std::ops::ControlFlow<std::ops::try_trait::NeverShortCircuit<u32>, u32>> thread 0
+Unwinding loop _RINvYINtNtNtCsi36QqhwMYzx_4core3ops5range9RangeFrommENtNtNtNtBa_4iter6traits8iterator8Iterator8try_foldmNCINvNtNtBV_8adapters3map12map_try_foldmmmINtNtB8_12control_flow11ControlFlowINtNtB8_9try_trait17NeverShortCircuitmEmENCNvCs66mF7N4XItJ_1_74main0NCINvNvXs0_NtB1L_10take_whileINtB4a_9TakeWhileppEBP_8try_fold5checkmmB2T_NCB3A_s_0NCINvMB2W_B2T_10wrap_mut_2mmNCINvNtB1L_6filter11filter_foldmmNCB3A_s0_0NCB3A_s1_0E0E0E0E0B2k_EB3C_.0 iteration 17 file /home/runner/.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/traits/iterator.rs line 2302 column 9 function <std::ops::RangeFrom<u32> as std::iter::Iterator>::try_fold::<u32, [closure@std::iter::adapters::map::map_try_fold<'_, u32, u32, u32, std::ops::ControlFlow<std::ops::try_trait::NeverShortCircuit<u32>, u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:31:19: 31:22], [closure@<std::iter::TakeWhile<I, P> as std::iter::Iterator>::try_fold::check<'_, u32, u32, std::ops::try_trait::NeverShortCircuit<u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:26: 32:38], [closure@std::ops::try_trait::NeverShortCircuit<u32>::wrap_mut_2<u32, u32, [closure@std::iter::adapters::filter::filter_fold<u32, u32, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:22: 33:34], [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:34:23: 34:39]>::{closure#0}]>::{closure#0}]>::{closure#0}]>::{closure#0}], std::ops::ControlFlow<std::ops::try_trait::NeverShortCircuit<u32>, u32>> thread 0
+Unwinding loop _RINvYINtNtNtCsi36QqhwMYzx_4core3ops5range9RangeFrommENtNtNtNtBa_4iter6traits8iterator8Iterator8try_foldmNCINvNtNtBV_8adapters3map12map_try_foldmmmINtNtB8_12control_flow11ControlFlowINtNtB8_9try_trait17NeverShortCircuitmEmENCNvCs66mF7N4XItJ_1_74main0NCINvNvXs0_NtB1L_10take_whileINtB4a_9TakeWhileppEBP_8try_fold5checkmmB2T_NCB3A_s_0NCINvMB2W_B2T_10wrap_mut_2mmNCINvNtB1L_6filter11filter_foldmmNCB3A_s0_0NCB3A_s1_0E0E0E0E0B2k_EB3C_.0 iteration 18 file /home/runner/.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/traits/iterator.rs line 2302 column 9 function <std::ops::RangeFrom<u32> as std::iter::Iterator>::try_fold::<u32, [closure@std::iter::adapters::map::map_try_fold<'_, u32, u32, u32, std::ops::ControlFlow<std::ops::try_trait::NeverShortCircuit<u32>, u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:31:19: 31:22], [closure@<std::iter::TakeWhile<I, P> as std::iter::Iterator>::try_fold::check<'_, u32, u32, std::ops::try_trait::NeverShortCircuit<u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:26: 32:38], [closure@std::ops::try_trait::NeverShortCircuit<u32>::wrap_mut_2<u32, u32, [closure@std::iter::adapters::filter::filter_fold<u32, u32, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:22: 33:34], [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:34:23: 34:39]>::{closure#0}]>::{closure#0}]>::{closure#0}]>::{closure#0}], std::ops::ControlFlow<std::ops::try_trait::NeverShortCircuit<u32>, u32>> thread 0
+Unwinding loop _RINvYINtNtNtCsi36QqhwMYzx_4core3ops5range9RangeFrommENtNtNtNtBa_4iter6traits8iterator8Iterator8try_foldmNCINvNtNtBV_8adapters3map12map_try_foldmmmINtNtB8_12control_flow11ControlFlowINtNtB8_9try_trait17NeverShortCircuitmEmENCNvCs66mF7N4XItJ_1_74main0NCINvNvXs0_NtB1L_10take_whileINtB4a_9TakeWhileppEBP_8try_fold5checkmmB2T_NCB3A_s_0NCINvMB2W_B2T_10wrap_mut_2mmNCINvNtB1L_6filter11filter_foldmmNCB3A_s0_0NCB3A_s1_0E0E0E0E0B2k_EB3C_.0 iteration 19 file /home/runner/.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/traits/iterator.rs line 2302 column 9 function <std::ops::RangeFrom<u32> as std::iter::Iterator>::try_fold::<u32, [closure@std::iter::adapters::map::map_try_fold<'_, u32, u32, u32, std::ops::ControlFlow<std::ops::try_trait::NeverShortCircuit<u32>, u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:31:19: 31:22], [closure@<std::iter::TakeWhile<I, P> as std::iter::Iterator>::try_fold::check<'_, u32, u32, std::ops::try_trait::NeverShortCircuit<u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:26: 32:38], [closure@std::ops::try_trait::NeverShortCircuit<u32>::wrap_mut_2<u32, u32, [closure@std::iter::adapters::filter::filter_fold<u32, u32, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:22: 33:34], [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:34:23: 34:39]>::{closure#0}]>::{closure#0}]>::{closure#0}]>::{closure#0}], std::ops::ControlFlow<std::ops::try_trait::NeverShortCircuit<u32>, u32>> thread 0
+Unwinding loop _RINvYINtNtNtCsi36QqhwMYzx_4core3ops5range9RangeFrommENtNtNtNtBa_4iter6traits8iterator8Iterator8try_foldmNCINvNtNtBV_8adapters3map12map_try_foldmmmINtNtB8_12control_flow11ControlFlowINtNtB8_9try_trait17NeverShortCircuitmEmENCNvCs66mF7N4XItJ_1_74main0NCINvNvXs0_NtB1L_10take_whileINtB4a_9TakeWhileppEBP_8try_fold5checkmmB2T_NCB3A_s_0NCINvMB2W_B2T_10wrap_mut_2mmNCINvNtB1L_6filter11filter_foldmmNCB3A_s0_0NCB3A_s1_0E0E0E0E0B2k_EB3C_.0 iteration 20 file /home/runner/.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/traits/iterator.rs line 2302 column 9 function <std::ops::RangeFrom<u32> as std::iter::Iterator>::try_fold::<u32, [closure@std::iter::adapters::map::map_try_fold<'_, u32, u32, u32, std::ops::ControlFlow<std::ops::try_trait::NeverShortCircuit<u32>, u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:31:19: 31:22], [closure@<std::iter::TakeWhile<I, P> as std::iter::Iterator>::try_fold::check<'_, u32, u32, std::ops::try_trait::NeverShortCircuit<u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:26: 32:38], [closure@std::ops::try_trait::NeverShortCircuit<u32>::wrap_mut_2<u32, u32, [closure@std::iter::adapters::filter::filter_fold<u32, u32, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:22: 33:34], [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:34:23: 34:39]>::{closure#0}]>::{closure#0}]>::{closure#0}]>::{closure#0}], std::ops::ControlFlow<std::ops::try_trait::NeverShortCircuit<u32>, u32>> thread 0
+Unwinding loop _RINvYINtNtNtCsi36QqhwMYzx_4core3ops5range9RangeFrommENtNtNtNtBa_4iter6traits8iterator8Iterator8try_foldmNCINvNtNtBV_8adapters3map12map_try_foldmmmINtNtB8_12control_flow11ControlFlowINtNtB8_9try_trait17NeverShortCircuitmEmENCNvCs66mF7N4XItJ_1_74main0NCINvNvXs0_NtB1L_10take_whileINtB4a_9TakeWhileppEBP_8try_fold5checkmmB2T_NCB3A_s_0NCINvMB2W_B2T_10wrap_mut_2mmNCINvNtB1L_6filter11filter_foldmmNCB3A_s0_0NCB3A_s1_0E0E0E0E0B2k_EB3C_.0 iteration 21 file /home/runner/.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/traits/iterator.rs line 2302 column 9 function <std::ops::RangeFrom<u32> as std::iter::Iterator>::try_fold::<u32, [closure@std::iter::adapters::map::map_try_fold<'_, u32, u32, u32, std::ops::ControlFlow<std::ops::try_trait::NeverShortCircuit<u32>, u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:31:19: 31:22], [closure@<std::iter::TakeWhile<I, P> as std::iter::Iterator>::try_fold::check<'_, u32, u32, std::ops::try_trait::NeverShortCircuit<u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:26: 32:38], [closure@std::ops::try_trait::NeverShortCircuit<u32>::wrap_mut_2<u32, u32, [closure@std::iter::adapters::filter::filter_fold<u32, u32, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:22: 33:34], [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:34:23: 34:39]>::{closure#0}]>::{closure#0}]>::{closure#0}]>::{closure#0}], std::ops::ControlFlow<std::ops::try_trait::NeverShortCircuit<u32>, u32>> thread 0
+Unwinding loop _RINvYINtNtNtCsi36QqhwMYzx_4core3ops5range9RangeFrommENtNtNtNtBa_4iter6traits8iterator8Iterator8try_foldmNCINvNtNtBV_8adapters3map12map_try_foldmmmINtNtB8_12control_flow11ControlFlowINtNtB8_9try_trait17NeverShortCircuitmEmENCNvCs66mF7N4XItJ_1_74main0NCINvNvXs0_NtB1L_10take_whileINtB4a_9TakeWhileppEBP_8try_fold5checkmmB2T_NCB3A_s_0NCINvMB2W_B2T_10wrap_mut_2mmNCINvNtB1L_6filter11filter_foldmmNCB3A_s0_0NCB3A_s1_0E0E0E0E0B2k_EB3C_.0 iteration 22 file /home/runner/.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/traits/iterator.rs line 2302 column 9 function <std::ops::RangeFrom<u32> as std::iter::Iterator>::try_fold::<u32, [closure@std::iter::adapters::map::map_try_fold<'_, u32, u32, u32, std::ops::ControlFlow<std::ops::try_trait::NeverShortCircuit<u32>, u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:31:19: 31:22], [closure@<std::iter::TakeWhile<I, P> as std::iter::Iterator>::try_fold::check<'_, u32, u32, std::ops::try_trait::NeverShortCircuit<u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:26: 32:38], [closure@std::ops::try_trait::NeverShortCircuit<u32>::wrap_mut_2<u32, u32, [closure@std::iter::adapters::filter::filter_fold<u32, u32, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:22: 33:34], [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:34:23: 34:39]>::{closure#0}]>::{closure#0}]>::{closure#0}]>::{closure#0}], std::ops::ControlFlow<std::ops::try_trait::NeverShortCircuit<u32>, u32>> thread 0
+Unwinding loop _RINvYINtNtNtCsi36QqhwMYzx_4core3ops5range9RangeFrommENtNtNtNtBa_4iter6traits8iterator8Iterator8try_foldmNCINvNtNtBV_8adapters3map12map_try_foldmmmINtNtB8_12control_flow11ControlFlowINtNtB8_9try_trait17NeverShortCircuitmEmENCNvCs66mF7N4XItJ_1_74main0NCINvNvXs0_NtB1L_10take_whileINtB4a_9TakeWhileppEBP_8try_fold5checkmmB2T_NCB3A_s_0NCINvMB2W_B2T_10wrap_mut_2mmNCINvNtB1L_6filter11filter_foldmmNCB3A_s0_0NCB3A_s1_0E0E0E0E0B2k_EB3C_.0 iteration 23 file /home/runner/.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/traits/iterator.rs line 2302 column 9 function <std::ops::RangeFrom<u32> as std::iter::Iterator>::try_fold::<u32, [closure@std::iter::adapters::map::map_try_fold<'_, u32, u32, u32, std::ops::ControlFlow<std::ops::try_trait::NeverShortCircuit<u32>, u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:31:19: 31:22], [closure@<std::iter::TakeWhile<I, P> as std::iter::Iterator>::try_fold::check<'_, u32, u32, std::ops::try_trait::NeverShortCircuit<u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:26: 32:38], [closure@std::ops::try_trait::NeverShortCircuit<u32>::wrap_mut_2<u32, u32, [closure@std::iter::adapters::filter::filter_fold<u32, u32, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:22: 33:34], [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:34:23: 34:39]>::{closure#0}]>::{closure#0}]>::{closure#0}]>::{closure#0}], std::ops::ControlFlow<std::ops::try_trait::NeverShortCircuit<u32>, u32>> thread 0
+Unwinding loop _RINvYINtNtNtCsi36QqhwMYzx_4core3ops5range9RangeFrommENtNtNtNtBa_4iter6traits8iterator8Iterator8try_foldmNCINvNtNtBV_8adapters3map12map_try_foldmmmINtNtB8_12control_flow11ControlFlowINtNtB8_9try_trait17NeverShortCircuitmEmENCNvCs66mF7N4XItJ_1_74main0NCINvNvXs0_NtB1L_10take_whileINtB4a_9TakeWhileppEBP_8try_fold5checkmmB2T_NCB3A_s_0NCINvMB2W_B2T_10wrap_mut_2mmNCINvNtB1L_6filter11filter_foldmmNCB3A_s0_0NCB3A_s1_0E0E0E0E0B2k_EB3C_.0 iteration 24 file /home/runner/.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/traits/iterator.rs line 2302 column 9 function <std::ops::RangeFrom<u32> as std::iter::Iterator>::try_fold::<u32, [closure@std::iter::adapters::map::map_try_fold<'_, u32, u32, u32, std::ops::ControlFlow<std::ops::try_trait::NeverShortCircuit<u32>, u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:31:19: 31:22], [closure@<std::iter::TakeWhile<I, P> as std::iter::Iterator>::try_fold::check<'_, u32, u32, std::ops::try_trait::NeverShortCircuit<u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:26: 32:38], [closure@std::ops::try_trait::NeverShortCircuit<u32>::wrap_mut_2<u32, u32, [closure@std::iter::adapters::filter::filter_fold<u32, u32, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:22: 33:34], [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:34:23: 34:39]>::{closure#0}]>::{closure#0}]>::{closure#0}]>::{closure#0}], std::ops::ControlFlow<std::ops::try_trait::NeverShortCircuit<u32>, u32>> thread 0
+Unwinding loop _RINvYINtNtNtCsi36QqhwMYzx_4core3ops5range9RangeFrommENtNtNtNtBa_4iter6traits8iterator8Iterator8try_foldmNCINvNtNtBV_8adapters3map12map_try_foldmmmINtNtB8_12control_flow11ControlFlowINtNtB8_9try_trait17NeverShortCircuitmEmENCNvCs66mF7N4XItJ_1_74main0NCINvNvXs0_NtB1L_10take_whileINtB4a_9TakeWhileppEBP_8try_fold5checkmmB2T_NCB3A_s_0NCINvMB2W_B2T_10wrap_mut_2mmNCINvNtB1L_6filter11filter_foldmmNCB3A_s0_0NCB3A_s1_0E0E0E0E0B2k_EB3C_.0 iteration 25 file /home/runner/.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/traits/iterator.rs line 2302 column 9 function <std::ops::RangeFrom<u32> as std::iter::Iterator>::try_fold::<u32, [closure@std::iter::adapters::map::map_try_fold<'_, u32, u32, u32, std::ops::ControlFlow<std::ops::try_trait::NeverShortCircuit<u32>, u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:31:19: 31:22], [closure@<std::iter::TakeWhile<I, P> as std::iter::Iterator>::try_fold::check<'_, u32, u32, std::ops::try_trait::NeverShortCircuit<u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:26: 32:38], [closure@std::ops::try_trait::NeverShortCircuit<u32>::wrap_mut_2<u32, u32, [closure@std::iter::adapters::filter::filter_fold<u32, u32, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:22: 33:34], [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:34:23: 34:39]>::{closure#0}]>::{closure#0}]>::{closure#0}]>::{closure#0}], std::ops::ControlFlow<std::ops::try_trait::NeverShortCircuit<u32>, u32>> thread 0
+Unwinding loop _RINvYINtNtNtCsi36QqhwMYzx_4core3ops5range9RangeFrommENtNtNtNtBa_4iter6traits8iterator8Iterator8try_foldmNCINvNtNtBV_8adapters3map12map_try_foldmmmINtNtB8_12control_flow11ControlFlowINtNtB8_9try_trait17NeverShortCircuitmEmENCNvCs66mF7N4XItJ_1_74main0NCINvNvXs0_NtB1L_10take_whileINtB4a_9TakeWhileppEBP_8try_fold5checkmmB2T_NCB3A_s_0NCINvMB2W_B2T_10wrap_mut_2mmNCINvNtB1L_6filter11filter_foldmmNCB3A_s0_0NCB3A_s1_0E0E0E0E0B2k_EB3C_.0 iteration 26 file /home/runner/.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/traits/iterator.rs line 2302 column 9 function <std::ops::RangeFrom<u32> as std::iter::Iterator>::try_fold::<u32, [closure@std::iter::adapters::map::map_try_fold<'_, u32, u32, u32, std::ops::ControlFlow<std::ops::try_trait::NeverShortCircuit<u32>, u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:31:19: 31:22], [closure@<std::iter::TakeWhile<I, P> as std::iter::Iterator>::try_fold::check<'_, u32, u32, std::ops::try_trait::NeverShortCircuit<u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:26: 32:38], [closure@std::ops::try_trait::NeverShortCircuit<u32>::wrap_mut_2<u32, u32, [closure@std::iter::adapters::filter::filter_fold<u32, u32, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:22: 33:34], [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:34:23: 34:39]>::{closure#0}]>::{closure#0}]>::{closure#0}]>::{closure#0}], std::ops::ControlFlow<std::ops::try_trait::NeverShortCircuit<u32>, u32>> thread 0
+Unwinding loop _RINvYINtNtNtCsi36QqhwMYzx_4core3ops5range9RangeFrommENtNtNtNtBa_4iter6traits8iterator8Iterator8try_foldmNCINvNtNtBV_8adapters3map12map_try_foldmmmINtNtB8_12control_flow11ControlFlowINtNtB8_9try_trait17NeverShortCircuitmEmENCNvCs66mF7N4XItJ_1_74main0NCINvNvXs0_NtB1L_10take_whileINtB4a_9TakeWhileppEBP_8try_fold5checkmmB2T_NCB3A_s_0NCINvMB2W_B2T_10wrap_mut_2mmNCINvNtB1L_6filter11filter_foldmmNCB3A_s0_0NCB3A_s1_0E0E0E0E0B2k_EB3C_.0 iteration 27 file /home/runner/.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/traits/iterator.rs line 2302 column 9 function <std::ops::RangeFrom<u32> as std::iter::Iterator>::try_fold::<u32, [closure@std::iter::adapters::map::map_try_fold<'_, u32, u32, u32, std::ops::ControlFlow<std::ops::try_trait::NeverShortCircuit<u32>, u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:31:19: 31:22], [closure@<std::iter::TakeWhile<I, P> as std::iter::Iterator>::try_fold::check<'_, u32, u32, std::ops::try_trait::NeverShortCircuit<u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:26: 32:38], [closure@std::ops::try_trait::NeverShortCircuit<u32>::wrap_mut_2<u32, u32, [closure@std::iter::adapters::filter::filter_fold<u32, u32, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:22: 33:34], [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:34:23: 34:39]>::{closure#0}]>::{closure#0}]>::{closure#0}]>::{closure#0}], std::ops::ControlFlow<std::ops::try_trait::NeverShortCircuit<u32>, u32>> thread 0
+Unwinding loop _RINvYINtNtNtCsi36QqhwMYzx_4core3ops5range9RangeFrommENtNtNtNtBa_4iter6traits8iterator8Iterator8try_foldmNCINvNtNtBV_8adapters3map12map_try_foldmmmINtNtB8_12control_flow11ControlFlowINtNtB8_9try_trait17NeverShortCircuitmEmENCNvCs66mF7N4XItJ_1_74main0NCINvNvXs0_NtB1L_10take_whileINtB4a_9TakeWhileppEBP_8try_fold5checkmmB2T_NCB3A_s_0NCINvMB2W_B2T_10wrap_mut_2mmNCINvNtB1L_6filter11filter_foldmmNCB3A_s0_0NCB3A_s1_0E0E0E0E0B2k_EB3C_.0 iteration 28 file /home/runner/.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/traits/iterator.rs line 2302 column 9 function <std::ops::RangeFrom<u32> as std::iter::Iterator>::try_fold::<u32, [closure@std::iter::adapters::map::map_try_fold<'_, u32, u32, u32, std::ops::ControlFlow<std::ops::try_trait::NeverShortCircuit<u32>, u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:31:19: 31:22], [closure@<std::iter::TakeWhile<I, P> as std::iter::Iterator>::try_fold::check<'_, u32, u32, std::ops::try_trait::NeverShortCircuit<u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:26: 32:38], [closure@std::ops::try_trait::NeverShortCircuit<u32>::wrap_mut_2<u32, u32, [closure@std::iter::adapters::filter::filter_fold<u32, u32, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:22: 33:34], [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:34:23: 34:39]>::{closure#0}]>::{closure#0}]>::{closure#0}]>::{closure#0}], std::ops::ControlFlow<std::ops::try_trait::NeverShortCircuit<u32>, u32>> thread 0
+Unwinding loop _RINvYINtNtNtCsi36QqhwMYzx_4core3ops5range9RangeFrommENtNtNtNtBa_4iter6traits8iterator8Iterator8try_foldmNCINvNtNtBV_8adapters3map12map_try_foldmmmINtNtB8_12control_flow11ControlFlowINtNtB8_9try_trait17NeverShortCircuitmEmENCNvCs66mF7N4XItJ_1_74main0NCINvNvXs0_NtB1L_10take_whileINtB4a_9TakeWhileppEBP_8try_fold5checkmmB2T_NCB3A_s_0NCINvMB2W_B2T_10wrap_mut_2mmNCINvNtB1L_6filter11filter_foldmmNCB3A_s0_0NCB3A_s1_0E0E0E0E0B2k_EB3C_.0 iteration 29 file /home/runner/.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/traits/iterator.rs line 2302 column 9 function <std::ops::RangeFrom<u32> as std::iter::Iterator>::try_fold::<u32, [closure@std::iter::adapters::map::map_try_fold<'_, u32, u32, u32, std::ops::ControlFlow<std::ops::try_trait::NeverShortCircuit<u32>, u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:31:19: 31:22], [closure@<std::iter::TakeWhile<I, P> as std::iter::Iterator>::try_fold::check<'_, u32, u32, std::ops::try_trait::NeverShortCircuit<u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:26: 32:38], [closure@std::ops::try_trait::NeverShortCircuit<u32>::wrap_mut_2<u32, u32, [closure@std::iter::adapters::filter::filter_fold<u32, u32, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:22: 33:34], [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:34:23: 34:39]>::{closure#0}]>::{closure#0}]>::{closure#0}]>::{closure#0}], std::ops::ControlFlow<std::ops::try_trait::NeverShortCircuit<u32>, u32>> thread 0
+Unwinding loop _RINvYINtNtNtCsi36QqhwMYzx_4core3ops5range9RangeFrommENtNtNtNtBa_4iter6traits8iterator8Iterator8try_foldmNCINvNtNtBV_8adapters3map12map_try_foldmmmINtNtB8_12control_flow11ControlFlowINtNtB8_9try_trait17NeverShortCircuitmEmENCNvCs66mF7N4XItJ_1_74main0NCINvNvXs0_NtB1L_10take_whileINtB4a_9TakeWhileppEBP_8try_fold5checkmmB2T_NCB3A_s_0NCINvMB2W_B2T_10wrap_mut_2mmNCINvNtB1L_6filter11filter_foldmmNCB3A_s0_0NCB3A_s1_0E0E0E0E0B2k_EB3C_.0 iteration 30 file /home/runner/.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/traits/iterator.rs line 2302 column 9 function <std::ops::RangeFrom<u32> as std::iter::Iterator>::try_fold::<u32, [closure@std::iter::adapters::map::map_try_fold<'_, u32, u32, u32, std::ops::ControlFlow<std::ops::try_trait::NeverShortCircuit<u32>, u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:31:19: 31:22], [closure@<std::iter::TakeWhile<I, P> as std::iter::Iterator>::try_fold::check<'_, u32, u32, std::ops::try_trait::NeverShortCircuit<u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:26: 32:38], [closure@std::ops::try_trait::NeverShortCircuit<u32>::wrap_mut_2<u32, u32, [closure@std::iter::adapters::filter::filter_fold<u32, u32, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:22: 33:34], [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:34:23: 34:39]>::{closure#0}]>::{closure#0}]>::{closure#0}]>::{closure#0}], std::ops::ControlFlow<std::ops::try_trait::NeverShortCircuit<u32>, u32>> thread 0
+Unwinding loop _RINvYINtNtNtCsi36QqhwMYzx_4core3ops5range9RangeFrommENtNtNtNtBa_4iter6traits8iterator8Iterator8try_foldmNCINvNtNtBV_8adapters3map12map_try_foldmmmINtNtB8_12control_flow11ControlFlowINtNtB8_9try_trait17NeverShortCircuitmEmENCNvCs66mF7N4XItJ_1_74main0NCINvNvXs0_NtB1L_10take_whileINtB4a_9TakeWhileppEBP_8try_fold5checkmmB2T_NCB3A_s_0NCINvMB2W_B2T_10wrap_mut_2mmNCINvNtB1L_6filter11filter_foldmmNCB3A_s0_0NCB3A_s1_0E0E0E0E0B2k_EB3C_.0 iteration 31 file /home/runner/.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/traits/iterator.rs line 2302 column 9 function <std::ops::RangeFrom<u32> as std::iter::Iterator>::try_fold::<u32, [closure@std::iter::adapters::map::map_try_fold<'_, u32, u32, u32, std::ops::ControlFlow<std::ops::try_trait::NeverShortCircuit<u32>, u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:31:19: 31:22], [closure@<std::iter::TakeWhile<I, P> as std::iter::Iterator>::try_fold::check<'_, u32, u32, std::ops::try_trait::NeverShortCircuit<u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:26: 32:38], [closure@std::ops::try_trait::NeverShortCircuit<u32>::wrap_mut_2<u32, u32, [closure@std::iter::adapters::filter::filter_fold<u32, u32, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:22: 33:34], [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:34:23: 34:39]>::{closure#0}]>::{closure#0}]>::{closure#0}]>::{closure#0}], std::ops::ControlFlow<std::ops::try_trait::NeverShortCircuit<u32>, u32>> thread 0
+Unwinding loop _RINvYINtNtNtCsi36QqhwMYzx_4core3ops5range9RangeFrommENtNtNtNtBa_4iter6traits8iterator8Iterator8try_foldmNCINvNtNtBV_8adapters3map12map_try_foldmmmINtNtB8_12control_flow11ControlFlowINtNtB8_9try_trait17NeverShortCircuitmEmENCNvCs66mF7N4XItJ_1_74main0NCINvNvXs0_NtB1L_10take_whileINtB4a_9TakeWhileppEBP_8try_fold5checkmmB2T_NCB3A_s_0NCINvMB2W_B2T_10wrap_mut_2mmNCINvNtB1L_6filter11filter_foldmmNCB3A_s0_0NCB3A_s1_0E0E0E0E0B2k_EB3C_.0 iteration 32 file /home/runner/.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/traits/iterator.rs line 2302 column 9 function <std::ops::RangeFrom<u32> as std::iter::Iterator>::try_fold::<u32, [closure@std::iter::adapters::map::map_try_fold<'_, u32, u32, u32, std::ops::ControlFlow<std::ops::try_trait::NeverShortCircuit<u32>, u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:31:19: 31:22], [closure@<std::iter::TakeWhile<I, P> as std::iter::Iterator>::try_fold::check<'_, u32, u32, std::ops::try_trait::NeverShortCircuit<u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:26: 32:38], [closure@std::ops::try_trait::NeverShortCircuit<u32>::wrap_mut_2<u32, u32, [closure@std::iter::adapters::filter::filter_fold<u32, u32, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:22: 33:34], [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:34:23: 34:39]>::{closure#0}]>::{closure#0}]>::{closure#0}]>::{closure#0}], std::ops::ControlFlow<std::ops::try_trait::NeverShortCircuit<u32>, u32>> thread 0
+Runtime Symex: 3.3721s
+size of program expression: 38119 steps
+slicing removed 27852 assignments
+Generated 4832 VCC(s), 829 remaining after simplification
+Runtime Postprocess Equation: 0.124841s
+Passing problem to propositional reduction
+converting SSA
+Runtime Convert SSA: 0.505684s
+Running propositional reduction
+Post-processing
+Runtime Post-process: 0.0001809s
+Solving with MiniSAT 2.2.1 with simplifier
+93323 variables, 143654 clauses
+SAT checker: instance is SATISFIABLE
+Runtime Solver: 0.29531s
+Runtime decision procedure: 0.835856s
+Running propositional reduction
+Solving with MiniSAT 2.2.1 with simplifier
+93323 variables, 499 clauses
+SAT checker: instance is UNSATISFIABLE
+Runtime Solver: 0.000856102s
+Runtime decision procedure: 0.0013823s
+
+RESULTS:
+Check 1: main.unreachable.1
+- Status: SUCCESS
+- Description: "unreachable code"
+- Location: tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:15:14 in function main
+
+Check 2: main.assertion.1
+- Status: SUCCESS
+- Description: "attempt to multiply with overflow"
+- Location: tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:17:25 in function main
+
+Check 3: main.assertion.2
+- Status: SUCCESS
+- Description: "attempt to add with overflow"
+- Location: tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:24:13 in function main
+
+Check 4: std::ptr::const_ptr::<impl *const u32>::is_aligned_to.assertion.1
+- Status: SUCCESS
+- Description: "This is a placeholder message; Kani doesn't support message formatted at runtime"
+- Location: ../../../.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ptr/const_ptr.rs:1574:13 in function std::ptr::const_ptr::<impl *const u32>::is_aligned_to
+
+Check 5: <std::ops::ControlFlow<std::ops::try_trait::NeverShortCircuit<u32>, u32> as std::ops::Try>::branch.unreachable.1
+- Status: SUCCESS
+- Description: "unreachable code"
+- Location: ../../../.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/control_flow.rs:111:15 in function <std::ops::ControlFlow<std::ops::try_trait::NeverShortCircuit<u32>, u32> as std::ops::Try>::branch
+
+Check 6: std::ops::ControlFlow::<std::ops::try_trait::NeverShortCircuit<u32>, <std::ops::try_trait::NeverShortCircuit<u32> as std::ops::Try>::Output>::into_try.unreachable.1
+- Status: SUCCESS
+- Description: "unreachable code"
+- Location: ../../../.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/control_flow.rs:253:15 in function std::ops::ControlFlow::<std::ops::try_trait::NeverShortCircuit<u32>, <std::ops::try_trait::NeverShortCircuit<u32> as std::ops::Try>::Output>::into_try
+
+Check 7: std::panic::Location::<'_>::caller.unsupported_construct.1
+- Status: SUCCESS
+- Description: "caller_location is not currently supported by Kani. Please post your example at https://github.com/model-checking/kani/issues/374"
+- Location: ../../../.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/panic/location.rs:88:9 in function std::panic::Location::<'_>::caller
+
+Check 8: std::rt::panic_fmt.unsupported_construct.1
+- Status: SUCCESS
+- Description: "call to foreign "Rust" function `rust_begin_unwind` is not currently supported by Kani. Please post your example at https://github.com/model-checking/kani/issues/new/choose"
+- Location: ../../../.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/panicking.rs:61:9 in function std::rt::panic_fmt
+
+Check 9: is_odd.assertion.1
+- Status: SUCCESS
+- Description: "attempt to calculate the remainder with a divisor of zero"
+- Location: tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:4:5 in function is_odd
+
+Check 10: std::fmt::Arguments::<'_>::new_v1.assertion.1
+- Status: SUCCESS
+- Description: "attempt to add with overflow"
+- Location: ../../../.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/fmt/mod.rs:309:56 in function std::fmt::Arguments::<'_>::new_v1
+
+Check 11: std::fmt::Arguments::<'_>::new_v1.assertion.2
+- Status: SUCCESS
+- Description: "This is a placeholder message; Kani doesn't support message formatted at runtime"
+- Location: ../../../.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/fmt/mod.rs:310:13 in function std::fmt::Arguments::<'_>::new_v1
+
+Check 12: <u32 as std::iter::Step>::forward_checked.unreachable.1
+- Status: SUCCESS
+- Description: "unreachable code"
+- Location: ../../../.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/range.rs:253:27 in function <u32 as std::iter::Step>::forward_checked
+
+Check 13: <std::ops::RangeFrom<u32> as std::iter::Iterator>::try_fold::<u32, [closure@std::iter::adapters::map::map_try_fold<'_, u32, u32, u32, std::ops::ControlFlow<std::ops::try_trait::NeverShortCircuit<u32>, u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:31:19: 31:22], [closure@<std::iter::TakeWhile<I, P> as std::iter::Iterator>::try_fold::check<'_, u32, u32, std::ops::try_trait::NeverShortCircuit<u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:26: 32:38], [closure@std::ops::try_trait::NeverShortCircuit<u32>::wrap_mut_2<u32, u32, [closure@std::iter::adapters::filter::filter_fold<u32, u32, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:22: 33:34], [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:34:23: 34:39]>::{closure#0}]>::{closure#0}]>::{closure#0}]>::{closure#0}], std::ops::ControlFlow<std::ops::try_trait::NeverShortCircuit<u32>, u32>>.unreachable.1
+- Status: SUCCESS
+- Description: "unreachable code"
+- Location: ../../../.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/traits/iterator.rs:2303:21 in function <std::ops::RangeFrom<u32> as std::iter::Iterator>::try_fold::<u32, [closure@std::iter::adapters::map::map_try_fold<'_, u32, u32, u32, std::ops::ControlFlow<std::ops::try_trait::NeverShortCircuit<u32>, u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:31:19: 31:22], [closure@<std::iter::TakeWhile<I, P> as std::iter::Iterator>::try_fold::check<'_, u32, u32, std::ops::try_trait::NeverShortCircuit<u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:26: 32:38], [closure@std::ops::try_trait::NeverShortCircuit<u32>::wrap_mut_2<u32, u32, [closure@std::iter::adapters::filter::filter_fold<u32, u32, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:22: 33:34], [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:34:23: 34:39]>::{closure#0}]>::{closure#0}]>::{closure#0}]>::{closure#0}], std::ops::ControlFlow<std::ops::try_trait::NeverShortCircuit<u32>, u32>>
+
+Check 14: std::ptr::write::<u32>.safety_check.1
+- Status: SUCCESS
+- Description: "`src` must be properly aligned"
+- Location: ../../../.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ptr/mod.rs:1386:9 in function std::ptr::write::<u32>
+
+Check 15: std::ptr::write::<u32>.safety_check.2
+- Status: SUCCESS
+- Description: "`dst` must be properly aligned"
+- Location: ../../../.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ptr/mod.rs:1386:9 in function std::ptr::write::<u32>
+
+Check 16: std::ptr::write::<u32>.arithmetic_overflow.1
+- Status: SUCCESS
+- Description: "copy_nonoverlapping: attempt to compute number in bytes which would overflow"
+- Location: ../../../.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ptr/mod.rs:1386:9 in function std::ptr::write::<u32>
+
+Check 17: std::fmt::Arguments::<'_>::new_const.assertion.1
+- Status: SUCCESS
+- Description: "This is a placeholder message; Kani doesn't support message formatted at runtime"
+- Location: ../../../.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/fmt/mod.rs:299:13 in function std::fmt::Arguments::<'_>::new_const
+
+Check 18: main::{closure#0}.assertion.1
+- Status: SUCCESS
+- Description: "attempt to multiply with overflow"
+- Location: tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:31:23 in function main::{closure#0}
+
+Check 19: main::{closure#3}.assertion.1
+- Status: SUCCESS
+- Description: "attempt to add with overflow"
+- Location: tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:34:40 in function main::{closure#3}
+
+Check 20: <std::ops::try_trait::NeverShortCircuit<u32> as std::ops::FromResidual>::from_residual.unreachable.1
+- Status: SUCCESS
+- Description: "unreachable code"
+- Location: ../../../.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/try_trait.rs:414:15 in function <std::ops::try_trait::NeverShortCircuit<u32> as std::ops::FromResidual>::from_residual
+
+Check 21: <u32 as std::iter::Step>::forward.assertion.1
+- Status: UNREACHABLE
+- Description: "attempt to add with overflow"
+- Location: ../../../.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/range.rs:207:25 in function <u32 as std::iter::Step>::forward
+
+Check 22: std::ops::ControlFlow::<std::ops::try_trait::NeverShortCircuit<u32>, <std::ops::try_trait::NeverShortCircuit<u32> as std::ops::Try>::Output>::from_try.unreachable.1
+- Status: SUCCESS
+- Description: "unreachable code"
+- Location: ../../../.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/control_flow.rs:244:15 in function std::ops::ControlFlow::<std::ops::try_trait::NeverShortCircuit<u32>, <std::ops::try_trait::NeverShortCircuit<u32> as std::ops::Try>::Output>::from_try
+
+Check 23: core::panicking::panic_nounwind_fmt.assertion.1
+- Status: SUCCESS
+- Description: "reached intrinsic::abort"
+- Location: ../../../.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/panicking.rs:82:9 in function core::panicking::panic_nounwind_fmt
+
+Check 24: std::ptr::const_ptr::<impl *const T>::is_aligned_to::runtime_impl.assertion.1
+- Status: UNREACHABLE
+- Description: "attempt to subtract with overflow"
+- Location: ../../../.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ptr/const_ptr.rs:1579:26 in function std::ptr::const_ptr::<impl *const T>::is_aligned_to::runtime_impl
+
+Check 25: std::clone::impls::<impl std::clone::Clone for u32>::clone.pointer_dereference.1
+- Status: SUCCESS
+- Description: "dereference failure: pointer NULL"
+- Location: ../../../.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/clone.rs:182:25 in function std::clone::impls::<impl std::clone::Clone for u32>::clone
+
+Check 26: std::clone::impls::<impl std::clone::Clone for u32>::clone.pointer_dereference.2
+- Status: SUCCESS
+- Description: "dereference failure: pointer invalid"
+- Location: ../../../.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/clone.rs:182:25 in function std::clone::impls::<impl std::clone::Clone for u32>::clone
+
+Check 27: std::clone::impls::<impl std::clone::Clone for u32>::clone.pointer_dereference.3
+- Status: SUCCESS
+- Description: "dereference failure: deallocated dynamic object"
+- Location: ../../../.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/clone.rs:182:25 in function std::clone::impls::<impl std::clone::Clone for u32>::clone
+
+Check 28: std::clone::impls::<impl std::clone::Clone for u32>::clone.pointer_dereference.4
+- Status: SUCCESS
+- Description: "dereference failure: dead object"
+- Location: ../../../.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/clone.rs:182:25 in function std::clone::impls::<impl std::clone::Clone for u32>::clone
+
+Check 29: std::clone::impls::<impl std::clone::Clone for u32>::clone.pointer_dereference.5
+- Status: SUCCESS
+- Description: "dereference failure: pointer outside object bounds"
+- Location: ../../../.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/clone.rs:182:25 in function std::clone::impls::<impl std::clone::Clone for u32>::clone
+
+Check 30: std::clone::impls::<impl std::clone::Clone for u32>::clone.pointer_dereference.6
+- Status: SUCCESS
+- Description: "dereference failure: invalid integer address"
+- Location: ../../../.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/clone.rs:182:25 in function std::clone::impls::<impl std::clone::Clone for u32>::clone
+
+Check 31: main::{closure#1}.pointer_dereference.1
+- Status: SUCCESS
+- Description: "dereference failure: pointer NULL"
+- Location: tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:28 in function main::{closure#1}
+
+Check 32: main::{closure#1}.pointer_dereference.2
+- Status: SUCCESS
+- Description: "dereference failure: pointer invalid"
+- Location: tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:28 in function main::{closure#1}
+
+Check 33: main::{closure#1}.pointer_dereference.3
+- Status: SUCCESS
+- Description: "dereference failure: deallocated dynamic object"
+- Location: tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:28 in function main::{closure#1}
+
+Check 34: main::{closure#1}.pointer_dereference.4
+- Status: SUCCESS
+- Description: "dereference failure: dead object"
+- Location: tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:28 in function main::{closure#1}
+
+Check 35: main::{closure#1}.pointer_dereference.5
+- Status: SUCCESS
+- Description: "dereference failure: pointer outside object bounds"
+- Location: tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:28 in function main::{closure#1}
+
+Check 36: main::{closure#1}.pointer_dereference.6
+- Status: SUCCESS
+- Description: "dereference failure: invalid integer address"
+- Location: tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:28 in function main::{closure#1}
+
+Check 37: main::{closure#1}.pointer_dereference.7
+- Status: SUCCESS
+- Description: "dereference failure: pointer NULL"
+- Location: tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:51 in function main::{closure#1}
+
+Check 38: main::{closure#1}.pointer_dereference.8
+- Status: SUCCESS
+- Description: "dereference failure: pointer invalid"
+- Location: tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:51 in function main::{closure#1}
+
+Check 39: main::{closure#1}.pointer_dereference.9
+- Status: SUCCESS
+- Description: "dereference failure: deallocated dynamic object"
+- Location: tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:51 in function main::{closure#1}
+
+Check 40: main::{closure#1}.pointer_dereference.10
+- Status: SUCCESS
+- Description: "dereference failure: dead object"
+- Location: tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:51 in function main::{closure#1}
+
+Check 41: main::{closure#1}.pointer_dereference.11
+- Status: SUCCESS
+- Description: "dereference failure: pointer outside object bounds"
+- Location: tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:51 in function main::{closure#1}
+
+Check 42: main::{closure#1}.pointer_dereference.12
+- Status: SUCCESS
+- Description: "dereference failure: invalid integer address"
+- Location: tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:51 in function main::{closure#1}
+
+Check 43: main::{closure#1}.pointer_dereference.13
+- Status: SUCCESS
+- Description: "dereference failure: pointer NULL"
+- Location: tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:51 in function main::{closure#1}
+
+Check 44: main::{closure#1}.pointer_dereference.14
+- Status: SUCCESS
+- Description: "dereference failure: pointer invalid"
+- Location: tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:51 in function main::{closure#1}
+
+Check 45: main::{closure#1}.pointer_dereference.15
+- Status: SUCCESS
+- Description: "dereference failure: deallocated dynamic object"
+- Location: tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:51 in function main::{closure#1}
+
+Check 46: main::{closure#1}.pointer_dereference.16
+- Status: SUCCESS
+- Description: "dereference failure: dead object"
+- Location: tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:51 in function main::{closure#1}
+
+Check 47: main::{closure#1}.pointer_dereference.17
+- Status: SUCCESS
+- Description: "dereference failure: pointer outside object bounds"
+- Location: tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:51 in function main::{closure#1}
+
+Check 48: main::{closure#1}.pointer_dereference.18
+- Status: SUCCESS
+- Description: "dereference failure: invalid integer address"
+- Location: tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:51 in function main::{closure#1}
+
+Check 49: std::fmt::Arguments::<'_>::new_const.pointer_dereference.1
+- Status: SUCCESS
+- Description: "dereference failure: dead object"
+- Location: ../../../.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/fmt/mod.rs:301:34 in function std::fmt::Arguments::<'_>::new_const
+
+Check 50: memcpy.pointer.1
+- Status: SUCCESS
+- Description: "same object violation"
+- Location: <builtin-library-memcpy>:33 in function memcpy
+
+Check 51: memcpy.pointer.2
+- Status: SUCCESS
+- Description: "same object violation"
+- Location: <builtin-library-memcpy>:34 in function memcpy
+
+Check 52: std::ptr::write::<u32>.precondition_instance.1
+- Status: SUCCESS
+- Description: "memcpy src/dst overlap"
+- Location: ../../../.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ptr/mod.rs:1386:9 in function std::ptr::write::<u32>
+
+Check 53: std::ptr::write::<u32>.precondition_instance.2
+- Status: SUCCESS
+- Description: "memcpy source region readable"
+- Location: ../../../.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ptr/mod.rs:1386:9 in function std::ptr::write::<u32>
+
+Check 54: std::ptr::write::<u32>.precondition_instance.3
+- Status: SUCCESS
+- Description: "memcpy destination region writeable"
+- Location: ../../../.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ptr/mod.rs:1386:9 in function std::ptr::write::<u32>
+
+Check 55: <std::iter::TakeWhile<std::iter::Map<std::ops::RangeFrom<u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:31:19: 31:22]>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:26: 32:38]> as std::iter::Iterator>::try_fold::<u32, [closure@std::ops::try_trait::NeverShortCircuit<u32>::wrap_mut_2<u32, u32, [closure@std::iter::adapters::filter::filter_fold<u32, u32, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:22: 33:34], [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:34:23: 34:39]>::{closure#0}]>::{closure#0}], std::ops::try_trait::NeverShortCircuit<u32>>.pointer_dereference.1
+- Status: SUCCESS
+- Description: "dereference failure: pointer NULL"
+- Location: ../../../.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/adapters/take_while.rs:88:12 in function <std::iter::TakeWhile<std::iter::Map<std::ops::RangeFrom<u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:31:19: 31:22]>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:26: 32:38]> as std::iter::Iterator>::try_fold::<u32, [closure@std::ops::try_trait::NeverShortCircuit<u32>::wrap_mut_2<u32, u32, [closure@std::iter::adapters::filter::filter_fold<u32, u32, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:22: 33:34], [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:34:23: 34:39]>::{closure#0}]>::{closure#0}], std::ops::try_trait::NeverShortCircuit<u32>>
+
+Check 56: <std::iter::TakeWhile<std::iter::Map<std::ops::RangeFrom<u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:31:19: 31:22]>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:26: 32:38]> as std::iter::Iterator>::try_fold::<u32, [closure@std::ops::try_trait::NeverShortCircuit<u32>::wrap_mut_2<u32, u32, [closure@std::iter::adapters::filter::filter_fold<u32, u32, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:22: 33:34], [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:34:23: 34:39]>::{closure#0}]>::{closure#0}], std::ops::try_trait::NeverShortCircuit<u32>>.pointer_dereference.2
+- Status: SUCCESS
+- Description: "dereference failure: pointer invalid"
+- Location: ../../../.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/adapters/take_while.rs:88:12 in function <std::iter::TakeWhile<std::iter::Map<std::ops::RangeFrom<u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:31:19: 31:22]>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:26: 32:38]> as std::iter::Iterator>::try_fold::<u32, [closure@std::ops::try_trait::NeverShortCircuit<u32>::wrap_mut_2<u32, u32, [closure@std::iter::adapters::filter::filter_fold<u32, u32, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:22: 33:34], [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:34:23: 34:39]>::{closure#0}]>::{closure#0}], std::ops::try_trait::NeverShortCircuit<u32>>
+
+Check 57: <std::iter::TakeWhile<std::iter::Map<std::ops::RangeFrom<u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:31:19: 31:22]>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:26: 32:38]> as std::iter::Iterator>::try_fold::<u32, [closure@std::ops::try_trait::NeverShortCircuit<u32>::wrap_mut_2<u32, u32, [closure@std::iter::adapters::filter::filter_fold<u32, u32, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:22: 33:34], [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:34:23: 34:39]>::{closure#0}]>::{closure#0}], std::ops::try_trait::NeverShortCircuit<u32>>.pointer_dereference.3
+- Status: SUCCESS
+- Description: "dereference failure: deallocated dynamic object"
+- Location: ../../../.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/adapters/take_while.rs:88:12 in function <std::iter::TakeWhile<std::iter::Map<std::ops::RangeFrom<u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:31:19: 31:22]>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:26: 32:38]> as std::iter::Iterator>::try_fold::<u32, [closure@std::ops::try_trait::NeverShortCircuit<u32>::wrap_mut_2<u32, u32, [closure@std::iter::adapters::filter::filter_fold<u32, u32, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:22: 33:34], [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:34:23: 34:39]>::{closure#0}]>::{closure#0}], std::ops::try_trait::NeverShortCircuit<u32>>
+
+Check 58: <std::iter::TakeWhile<std::iter::Map<std::ops::RangeFrom<u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:31:19: 31:22]>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:26: 32:38]> as std::iter::Iterator>::try_fold::<u32, [closure@std::ops::try_trait::NeverShortCircuit<u32>::wrap_mut_2<u32, u32, [closure@std::iter::adapters::filter::filter_fold<u32, u32, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:22: 33:34], [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:34:23: 34:39]>::{closure#0}]>::{closure#0}], std::ops::try_trait::NeverShortCircuit<u32>>.pointer_dereference.4
+- Status: SUCCESS
+- Description: "dereference failure: dead object"
+- Location: ../../../.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/adapters/take_while.rs:88:12 in function <std::iter::TakeWhile<std::iter::Map<std::ops::RangeFrom<u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:31:19: 31:22]>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:26: 32:38]> as std::iter::Iterator>::try_fold::<u32, [closure@std::ops::try_trait::NeverShortCircuit<u32>::wrap_mut_2<u32, u32, [closure@std::iter::adapters::filter::filter_fold<u32, u32, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:22: 33:34], [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:34:23: 34:39]>::{closure#0}]>::{closure#0}], std::ops::try_trait::NeverShortCircuit<u32>>
+
+Check 59: <std::iter::TakeWhile<std::iter::Map<std::ops::RangeFrom<u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:31:19: 31:22]>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:26: 32:38]> as std::iter::Iterator>::try_fold::<u32, [closure@std::ops::try_trait::NeverShortCircuit<u32>::wrap_mut_2<u32, u32, [closure@std::iter::adapters::filter::filter_fold<u32, u32, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:22: 33:34], [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:34:23: 34:39]>::{closure#0}]>::{closure#0}], std::ops::try_trait::NeverShortCircuit<u32>>.pointer_dereference.5
+- Status: SUCCESS
+- Description: "dereference failure: pointer outside object bounds"
+- Location: ../../../.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/adapters/take_while.rs:88:12 in function <std::iter::TakeWhile<std::iter::Map<std::ops::RangeFrom<u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:31:19: 31:22]>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:26: 32:38]> as std::iter::Iterator>::try_fold::<u32, [closure@std::ops::try_trait::NeverShortCircuit<u32>::wrap_mut_2<u32, u32, [closure@std::iter::adapters::filter::filter_fold<u32, u32, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:22: 33:34], [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:34:23: 34:39]>::{closure#0}]>::{closure#0}], std::ops::try_trait::NeverShortCircuit<u32>>
+
+Check 60: <std::iter::TakeWhile<std::iter::Map<std::ops::RangeFrom<u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:31:19: 31:22]>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:26: 32:38]> as std::iter::Iterator>::try_fold::<u32, [closure@std::ops::try_trait::NeverShortCircuit<u32>::wrap_mut_2<u32, u32, [closure@std::iter::adapters::filter::filter_fold<u32, u32, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:22: 33:34], [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:34:23: 34:39]>::{closure#0}]>::{closure#0}], std::ops::try_trait::NeverShortCircuit<u32>>.pointer_dereference.6
+- Status: SUCCESS
+- Description: "dereference failure: invalid integer address"
+- Location: ../../../.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/adapters/take_while.rs:88:12 in function <std::iter::TakeWhile<std::iter::Map<std::ops::RangeFrom<u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:31:19: 31:22]>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:26: 32:38]> as std::iter::Iterator>::try_fold::<u32, [closure@std::ops::try_trait::NeverShortCircuit<u32>::wrap_mut_2<u32, u32, [closure@std::iter::adapters::filter::filter_fold<u32, u32, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:22: 33:34], [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:34:23: 34:39]>::{closure#0}]>::{closure#0}], std::ops::try_trait::NeverShortCircuit<u32>>
+
+Check 61: main::{closure#2}.pointer_dereference.1
+- Status: SUCCESS
+- Description: "dereference failure: pointer NULL"
+- Location: tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:24 in function main::{closure#2}
+
+Check 62: main::{closure#2}.pointer_dereference.2
+- Status: SUCCESS
+- Description: "dereference failure: pointer invalid"
+- Location: tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:24 in function main::{closure#2}
+
+Check 63: main::{closure#2}.pointer_dereference.3
+- Status: SUCCESS
+- Description: "dereference failure: deallocated dynamic object"
+- Location: tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:24 in function main::{closure#2}
+
+Check 64: main::{closure#2}.pointer_dereference.4
+- Status: SUCCESS
+- Description: "dereference failure: dead object"
+- Location: tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:24 in function main::{closure#2}
+
+Check 65: main::{closure#2}.pointer_dereference.5
+- Status: SUCCESS
+- Description: "dereference failure: pointer outside object bounds"
+- Location: tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:24 in function main::{closure#2}
+
+Check 66: main::{closure#2}.pointer_dereference.6
+- Status: SUCCESS
+- Description: "dereference failure: invalid integer address"
+- Location: tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:24 in function main::{closure#2}
+
+Check 67: std::ptr::read::<u32>.pointer_dereference.1
+- Status: SUCCESS
+- Description: "dereference failure: pointer NULL"
+- Location: ../../../.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ptr/mod.rs:1188:13 in function std::ptr::read::<u32>
+
+Check 68: std::ptr::read::<u32>.pointer_dereference.2
+- Status: SUCCESS
+- Description: "dereference failure: pointer invalid"
+- Location: ../../../.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ptr/mod.rs:1188:13 in function std::ptr::read::<u32>
+
+Check 69: std::ptr::read::<u32>.pointer_dereference.3
+- Status: SUCCESS
+- Description: "dereference failure: deallocated dynamic object"
+- Location: ../../../.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ptr/mod.rs:1188:13 in function std::ptr::read::<u32>
+
+Check 70: std::ptr::read::<u32>.pointer_dereference.4
+- Status: SUCCESS
+- Description: "dereference failure: dead object"
+- Location: ../../../.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ptr/mod.rs:1188:13 in function std::ptr::read::<u32>
+
+Check 71: std::ptr::read::<u32>.pointer_dereference.5
+- Status: SUCCESS
+- Description: "dereference failure: pointer outside object bounds"
+- Location: ../../../.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ptr/mod.rs:1188:13 in function std::ptr::read::<u32>
+
+Check 72: std::ptr::read::<u32>.pointer_dereference.6
+- Status: SUCCESS
+- Description: "dereference failure: invalid integer address"
+- Location: ../../../.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ptr/mod.rs:1188:13 in function std::ptr::read::<u32>
+
+Check 73: std::option::Option::<u32>::is_some.pointer_dereference.1
+- Status: SUCCESS
+- Description: "dereference failure: pointer NULL"
+- Location: ../../../.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/option.rs:599:18 in function std::option::Option::<u32>::is_some
+
+Check 74: std::option::Option::<u32>::is_some.pointer_dereference.2
+- Status: SUCCESS
+- Description: "dereference failure: pointer invalid"
+- Location: ../../../.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/option.rs:599:18 in function std::option::Option::<u32>::is_some
+
+Check 75: std::option::Option::<u32>::is_some.pointer_dereference.3
+- Status: SUCCESS
+- Description: "dereference failure: deallocated dynamic object"
+- Location: ../../../.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/option.rs:599:18 in function std::option::Option::<u32>::is_some
+
+Check 76: std::option::Option::<u32>::is_some.pointer_dereference.4
+- Status: SUCCESS
+- Description: "dereference failure: dead object"
+- Location: ../../../.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/option.rs:599:18 in function std::option::Option::<u32>::is_some
+
+Check 77: std::option::Option::<u32>::is_some.pointer_dereference.5
+- Status: SUCCESS
+- Description: "dereference failure: pointer outside object bounds"
+- Location: ../../../.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/option.rs:599:18 in function std::option::Option::<u32>::is_some
+
+Check 78: std::option::Option::<u32>::is_some.pointer_dereference.6
+- Status: SUCCESS
+- Description: "dereference failure: invalid integer address"
+- Location: ../../../.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/option.rs:599:18 in function std::option::Option::<u32>::is_some
+
+Check 79: std::iter::adapters::map::map_try_fold::<'_, u32, u32, u32, std::ops::ControlFlow<std::ops::try_trait::NeverShortCircuit<u32>, u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:31:19: 31:22], [closure@<std::iter::TakeWhile<I, P> as std::iter::Iterator>::try_fold::check<'_, u32, u32, std::ops::try_trait::NeverShortCircuit<u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:26: 32:38], [closure@std::ops::try_trait::NeverShortCircuit<u32>::wrap_mut_2<u32, u32, [closure@std::iter::adapters::filter::filter_fold<u32, u32, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:22: 33:34], [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:34:23: 34:39]>::{closure#0}]>::{closure#0}]>::{closure#0}]>::{closure#0}.pointer_dereference.1
+- Status: SUCCESS
+- Description: "dereference failure: pointer NULL"
+- Location: ../../../.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/adapters/map.rs:91:28 in function std::iter::adapters::map::map_try_fold::<'_, u32, u32, u32, std::ops::ControlFlow<std::ops::try_trait::NeverShortCircuit<u32>, u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:31:19: 31:22], [closure@<std::iter::TakeWhile<I, P> as std::iter::Iterator>::try_fold::check<'_, u32, u32, std::ops::try_trait::NeverShortCircuit<u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:26: 32:38], [closure@std::ops::try_trait::NeverShortCircuit<u32>::wrap_mut_2<u32, u32, [closure@std::iter::adapters::filter::filter_fold<u32, u32, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:22: 33:34], [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:34:23: 34:39]>::{closure#0}]>::{closure#0}]>::{closure#0}]>::{closure#0}
+
+Check 80: std::iter::adapters::map::map_try_fold::<'_, u32, u32, u32, std::ops::ControlFlow<std::ops::try_trait::NeverShortCircuit<u32>, u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:31:19: 31:22], [closure@<std::iter::TakeWhile<I, P> as std::iter::Iterator>::try_fold::check<'_, u32, u32, std::ops::try_trait::NeverShortCircuit<u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:26: 32:38], [closure@std::ops::try_trait::NeverShortCircuit<u32>::wrap_mut_2<u32, u32, [closure@std::iter::adapters::filter::filter_fold<u32, u32, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:22: 33:34], [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:34:23: 34:39]>::{closure#0}]>::{closure#0}]>::{closure#0}]>::{closure#0}.pointer_dereference.2
+- Status: SUCCESS
+- Description: "dereference failure: pointer invalid"
+- Location: ../../../.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/adapters/map.rs:91:28 in function std::iter::adapters::map::map_try_fold::<'_, u32, u32, u32, std::ops::ControlFlow<std::ops::try_trait::NeverShortCircuit<u32>, u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:31:19: 31:22], [closure@<std::iter::TakeWhile<I, P> as std::iter::Iterator>::try_fold::check<'_, u32, u32, std::ops::try_trait::NeverShortCircuit<u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:26: 32:38], [closure@std::ops::try_trait::NeverShortCircuit<u32>::wrap_mut_2<u32, u32, [closure@std::iter::adapters::filter::filter_fold<u32, u32, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:22: 33:34], [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:34:23: 34:39]>::{closure#0}]>::{closure#0}]>::{closure#0}]>::{closure#0}
+
+Check 81: std::iter::adapters::map::map_try_fold::<'_, u32, u32, u32, std::ops::ControlFlow<std::ops::try_trait::NeverShortCircuit<u32>, u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:31:19: 31:22], [closure@<std::iter::TakeWhile<I, P> as std::iter::Iterator>::try_fold::check<'_, u32, u32, std::ops::try_trait::NeverShortCircuit<u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:26: 32:38], [closure@std::ops::try_trait::NeverShortCircuit<u32>::wrap_mut_2<u32, u32, [closure@std::iter::adapters::filter::filter_fold<u32, u32, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:22: 33:34], [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:34:23: 34:39]>::{closure#0}]>::{closure#0}]>::{closure#0}]>::{closure#0}.pointer_dereference.3
+- Status: SUCCESS
+- Description: "dereference failure: deallocated dynamic object"
+- Location: ../../../.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/adapters/map.rs:91:28 in function std::iter::adapters::map::map_try_fold::<'_, u32, u32, u32, std::ops::ControlFlow<std::ops::try_trait::NeverShortCircuit<u32>, u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:31:19: 31:22], [closure@<std::iter::TakeWhile<I, P> as std::iter::Iterator>::try_fold::check<'_, u32, u32, std::ops::try_trait::NeverShortCircuit<u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:26: 32:38], [closure@std::ops::try_trait::NeverShortCircuit<u32>::wrap_mut_2<u32, u32, [closure@std::iter::adapters::filter::filter_fold<u32, u32, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:22: 33:34], [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:34:23: 34:39]>::{closure#0}]>::{closure#0}]>::{closure#0}]>::{closure#0}
+
+Check 82: std::iter::adapters::map::map_try_fold::<'_, u32, u32, u32, std::ops::ControlFlow<std::ops::try_trait::NeverShortCircuit<u32>, u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:31:19: 31:22], [closure@<std::iter::TakeWhile<I, P> as std::iter::Iterator>::try_fold::check<'_, u32, u32, std::ops::try_trait::NeverShortCircuit<u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:26: 32:38], [closure@std::ops::try_trait::NeverShortCircuit<u32>::wrap_mut_2<u32, u32, [closure@std::iter::adapters::filter::filter_fold<u32, u32, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:22: 33:34], [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:34:23: 34:39]>::{closure#0}]>::{closure#0}]>::{closure#0}]>::{closure#0}.pointer_dereference.4
+- Status: SUCCESS
+- Description: "dereference failure: dead object"
+- Location: ../../../.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/adapters/map.rs:91:28 in function std::iter::adapters::map::map_try_fold::<'_, u32, u32, u32, std::ops::ControlFlow<std::ops::try_trait::NeverShortCircuit<u32>, u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:31:19: 31:22], [closure@<std::iter::TakeWhile<I, P> as std::iter::Iterator>::try_fold::check<'_, u32, u32, std::ops::try_trait::NeverShortCircuit<u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:26: 32:38], [closure@std::ops::try_trait::NeverShortCircuit<u32>::wrap_mut_2<u32, u32, [closure@std::iter::adapters::filter::filter_fold<u32, u32, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:22: 33:34], [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:34:23: 34:39]>::{closure#0}]>::{closure#0}]>::{closure#0}]>::{closure#0}
+
+Check 83: std::iter::adapters::map::map_try_fold::<'_, u32, u32, u32, std::ops::ControlFlow<std::ops::try_trait::NeverShortCircuit<u32>, u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:31:19: 31:22], [closure@<std::iter::TakeWhile<I, P> as std::iter::Iterator>::try_fold::check<'_, u32, u32, std::ops::try_trait::NeverShortCircuit<u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:26: 32:38], [closure@std::ops::try_trait::NeverShortCircuit<u32>::wrap_mut_2<u32, u32, [closure@std::iter::adapters::filter::filter_fold<u32, u32, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:22: 33:34], [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:34:23: 34:39]>::{closure#0}]>::{closure#0}]>::{closure#0}]>::{closure#0}.pointer_dereference.5
+- Status: SUCCESS
+- Description: "dereference failure: pointer outside object bounds"
+- Location: ../../../.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/adapters/map.rs:91:28 in function std::iter::adapters::map::map_try_fold::<'_, u32, u32, u32, std::ops::ControlFlow<std::ops::try_trait::NeverShortCircuit<u32>, u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:31:19: 31:22], [closure@<std::iter::TakeWhile<I, P> as std::iter::Iterator>::try_fold::check<'_, u32, u32, std::ops::try_trait::NeverShortCircuit<u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:26: 32:38], [closure@std::ops::try_trait::NeverShortCircuit<u32>::wrap_mut_2<u32, u32, [closure@std::iter::adapters::filter::filter_fold<u32, u32, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:22: 33:34], [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:34:23: 34:39]>::{closure#0}]>::{closure#0}]>::{closure#0}]>::{closure#0}
+
+Check 84: std::iter::adapters::map::map_try_fold::<'_, u32, u32, u32, std::ops::ControlFlow<std::ops::try_trait::NeverShortCircuit<u32>, u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:31:19: 31:22], [closure@<std::iter::TakeWhile<I, P> as std::iter::Iterator>::try_fold::check<'_, u32, u32, std::ops::try_trait::NeverShortCircuit<u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:26: 32:38], [closure@std::ops::try_trait::NeverShortCircuit<u32>::wrap_mut_2<u32, u32, [closure@std::iter::adapters::filter::filter_fold<u32, u32, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:22: 33:34], [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:34:23: 34:39]>::{closure#0}]>::{closure#0}]>::{closure#0}]>::{closure#0}.pointer_dereference.6
+- Status: SUCCESS
+- Description: "dereference failure: invalid integer address"
+- Location: ../../../.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/adapters/map.rs:91:28 in function std::iter::adapters::map::map_try_fold::<'_, u32, u32, u32, std::ops::ControlFlow<std::ops::try_trait::NeverShortCircuit<u32>, u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:31:19: 31:22], [closure@<std::iter::TakeWhile<I, P> as std::iter::Iterator>::try_fold::check<'_, u32, u32, std::ops::try_trait::NeverShortCircuit<u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:26: 32:38], [closure@std::ops::try_trait::NeverShortCircuit<u32>::wrap_mut_2<u32, u32, [closure@std::iter::adapters::filter::filter_fold<u32, u32, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:22: 33:34], [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:34:23: 34:39]>::{closure#0}]>::{closure#0}]>::{closure#0}]>::{closure#0}
+
+Check 85: std::fmt::Arguments::<'_>::new_v1.pointer_dereference.1
+- Status: SUCCESS
+- Description: "dereference failure: dead object"
+- Location: ../../../.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/fmt/mod.rs:312:34 in function std::fmt::Arguments::<'_>::new_v1
+
+Check 86: <std::iter::TakeWhile<I, P> as std::iter::Iterator>::try_fold::check::<'_, u32, u32, std::ops::try_trait::NeverShortCircuit<u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:26: 32:38], [closure@std::ops::try_trait::NeverShortCircuit<u32>::wrap_mut_2<u32, u32, [closure@std::iter::adapters::filter::filter_fold<u32, u32, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:22: 33:34], [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:34:23: 34:39]>::{closure#0}]>::{closure#0}]>::{closure#0}.pointer_dereference.1
+- Status: SUCCESS
+- Description: "dereference failure: pointer NULL"
+- Location: ../../../.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/adapters/take_while.rs:79:20 in function <std::iter::TakeWhile<I, P> as std::iter::Iterator>::try_fold::check::<'_, u32, u32, std::ops::try_trait::NeverShortCircuit<u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:26: 32:38], [closure@std::ops::try_trait::NeverShortCircuit<u32>::wrap_mut_2<u32, u32, [closure@std::iter::adapters::filter::filter_fold<u32, u32, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:22: 33:34], [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:34:23: 34:39]>::{closure#0}]>::{closure#0}]>::{closure#0}
+
+Check 87: <std::iter::TakeWhile<I, P> as std::iter::Iterator>::try_fold::check::<'_, u32, u32, std::ops::try_trait::NeverShortCircuit<u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:26: 32:38], [closure@std::ops::try_trait::NeverShortCircuit<u32>::wrap_mut_2<u32, u32, [closure@std::iter::adapters::filter::filter_fold<u32, u32, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:22: 33:34], [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:34:23: 34:39]>::{closure#0}]>::{closure#0}]>::{closure#0}.pointer_dereference.2
+- Status: SUCCESS
+- Description: "dereference failure: pointer invalid"
+- Location: ../../../.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/adapters/take_while.rs:79:20 in function <std::iter::TakeWhile<I, P> as std::iter::Iterator>::try_fold::check::<'_, u32, u32, std::ops::try_trait::NeverShortCircuit<u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:26: 32:38], [closure@std::ops::try_trait::NeverShortCircuit<u32>::wrap_mut_2<u32, u32, [closure@std::iter::adapters::filter::filter_fold<u32, u32, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:22: 33:34], [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:34:23: 34:39]>::{closure#0}]>::{closure#0}]>::{closure#0}
+
+Check 88: <std::iter::TakeWhile<I, P> as std::iter::Iterator>::try_fold::check::<'_, u32, u32, std::ops::try_trait::NeverShortCircuit<u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:26: 32:38], [closure@std::ops::try_trait::NeverShortCircuit<u32>::wrap_mut_2<u32, u32, [closure@std::iter::adapters::filter::filter_fold<u32, u32, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:22: 33:34], [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:34:23: 34:39]>::{closure#0}]>::{closure#0}]>::{closure#0}.pointer_dereference.3
+- Status: SUCCESS
+- Description: "dereference failure: deallocated dynamic object"
+- Location: ../../../.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/adapters/take_while.rs:79:20 in function <std::iter::TakeWhile<I, P> as std::iter::Iterator>::try_fold::check::<'_, u32, u32, std::ops::try_trait::NeverShortCircuit<u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:26: 32:38], [closure@std::ops::try_trait::NeverShortCircuit<u32>::wrap_mut_2<u32, u32, [closure@std::iter::adapters::filter::filter_fold<u32, u32, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:22: 33:34], [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:34:23: 34:39]>::{closure#0}]>::{closure#0}]>::{closure#0}
+
+Check 89: <std::iter::TakeWhile<I, P> as std::iter::Iterator>::try_fold::check::<'_, u32, u32, std::ops::try_trait::NeverShortCircuit<u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:26: 32:38], [closure@std::ops::try_trait::NeverShortCircuit<u32>::wrap_mut_2<u32, u32, [closure@std::iter::adapters::filter::filter_fold<u32, u32, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:22: 33:34], [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:34:23: 34:39]>::{closure#0}]>::{closure#0}]>::{closure#0}.pointer_dereference.4
+- Status: SUCCESS
+- Description: "dereference failure: dead object"
+- Location: ../../../.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/adapters/take_while.rs:79:20 in function <std::iter::TakeWhile<I, P> as std::iter::Iterator>::try_fold::check::<'_, u32, u32, std::ops::try_trait::NeverShortCircuit<u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:26: 32:38], [closure@std::ops::try_trait::NeverShortCircuit<u32>::wrap_mut_2<u32, u32, [closure@std::iter::adapters::filter::filter_fold<u32, u32, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:22: 33:34], [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:34:23: 34:39]>::{closure#0}]>::{closure#0}]>::{closure#0}
+
+Check 90: <std::iter::TakeWhile<I, P> as std::iter::Iterator>::try_fold::check::<'_, u32, u32, std::ops::try_trait::NeverShortCircuit<u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:26: 32:38], [closure@std::ops::try_trait::NeverShortCircuit<u32>::wrap_mut_2<u32, u32, [closure@std::iter::adapters::filter::filter_fold<u32, u32, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:22: 33:34], [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:34:23: 34:39]>::{closure#0}]>::{closure#0}]>::{closure#0}.pointer_dereference.5
+- Status: SUCCESS
+- Description: "dereference failure: pointer outside object bounds"
+- Location: ../../../.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/adapters/take_while.rs:79:20 in function <std::iter::TakeWhile<I, P> as std::iter::Iterator>::try_fold::check::<'_, u32, u32, std::ops::try_trait::NeverShortCircuit<u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:26: 32:38], [closure@std::ops::try_trait::NeverShortCircuit<u32>::wrap_mut_2<u32, u32, [closure@std::iter::adapters::filter::filter_fold<u32, u32, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:22: 33:34], [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:34:23: 34:39]>::{closure#0}]>::{closure#0}]>::{closure#0}
+
+Check 91: <std::iter::TakeWhile<I, P> as std::iter::Iterator>::try_fold::check::<'_, u32, u32, std::ops::try_trait::NeverShortCircuit<u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:26: 32:38], [closure@std::ops::try_trait::NeverShortCircuit<u32>::wrap_mut_2<u32, u32, [closure@std::iter::adapters::filter::filter_fold<u32, u32, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:22: 33:34], [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:34:23: 34:39]>::{closure#0}]>::{closure#0}]>::{closure#0}.pointer_dereference.6
+- Status: SUCCESS
+- Description: "dereference failure: invalid integer address"
+- Location: ../../../.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/adapters/take_while.rs:79:20 in function <std::iter::TakeWhile<I, P> as std::iter::Iterator>::try_fold::check::<'_, u32, u32, std::ops::try_trait::NeverShortCircuit<u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:26: 32:38], [closure@std::ops::try_trait::NeverShortCircuit<u32>::wrap_mut_2<u32, u32, [closure@std::iter::adapters::filter::filter_fold<u32, u32, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:22: 33:34], [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:34:23: 34:39]>::{closure#0}]>::{closure#0}]>::{closure#0}
+
+Check 92: <std::iter::TakeWhile<I, P> as std::iter::Iterator>::try_fold::check::<'_, u32, u32, std::ops::try_trait::NeverShortCircuit<u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:26: 32:38], [closure@std::ops::try_trait::NeverShortCircuit<u32>::wrap_mut_2<u32, u32, [closure@std::iter::adapters::filter::filter_fold<u32, u32, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:22: 33:34], [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:34:23: 34:39]>::{closure#0}]>::{closure#0}]>::{closure#0}.pointer_dereference.7
+- Status: SUCCESS
+- Description: "dereference failure: pointer NULL"
+- Location: ../../../.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/adapters/take_while.rs:82:21 in function <std::iter::TakeWhile<I, P> as std::iter::Iterator>::try_fold::check::<'_, u32, u32, std::ops::try_trait::NeverShortCircuit<u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:26: 32:38], [closure@std::ops::try_trait::NeverShortCircuit<u32>::wrap_mut_2<u32, u32, [closure@std::iter::adapters::filter::filter_fold<u32, u32, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:22: 33:34], [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:34:23: 34:39]>::{closure#0}]>::{closure#0}]>::{closure#0}
+
+Check 93: <std::iter::TakeWhile<I, P> as std::iter::Iterator>::try_fold::check::<'_, u32, u32, std::ops::try_trait::NeverShortCircuit<u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:26: 32:38], [closure@std::ops::try_trait::NeverShortCircuit<u32>::wrap_mut_2<u32, u32, [closure@std::iter::adapters::filter::filter_fold<u32, u32, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:22: 33:34], [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:34:23: 34:39]>::{closure#0}]>::{closure#0}]>::{closure#0}.pointer_dereference.8
+- Status: SUCCESS
+- Description: "dereference failure: pointer invalid"
+- Location: ../../../.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/adapters/take_while.rs:82:21 in function <std::iter::TakeWhile<I, P> as std::iter::Iterator>::try_fold::check::<'_, u32, u32, std::ops::try_trait::NeverShortCircuit<u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:26: 32:38], [closure@std::ops::try_trait::NeverShortCircuit<u32>::wrap_mut_2<u32, u32, [closure@std::iter::adapters::filter::filter_fold<u32, u32, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:22: 33:34], [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:34:23: 34:39]>::{closure#0}]>::{closure#0}]>::{closure#0}
+
+Check 94: <std::iter::TakeWhile<I, P> as std::iter::Iterator>::try_fold::check::<'_, u32, u32, std::ops::try_trait::NeverShortCircuit<u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:26: 32:38], [closure@std::ops::try_trait::NeverShortCircuit<u32>::wrap_mut_2<u32, u32, [closure@std::iter::adapters::filter::filter_fold<u32, u32, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:22: 33:34], [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:34:23: 34:39]>::{closure#0}]>::{closure#0}]>::{closure#0}.pointer_dereference.9
+- Status: SUCCESS
+- Description: "dereference failure: deallocated dynamic object"
+- Location: ../../../.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/adapters/take_while.rs:82:21 in function <std::iter::TakeWhile<I, P> as std::iter::Iterator>::try_fold::check::<'_, u32, u32, std::ops::try_trait::NeverShortCircuit<u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:26: 32:38], [closure@std::ops::try_trait::NeverShortCircuit<u32>::wrap_mut_2<u32, u32, [closure@std::iter::adapters::filter::filter_fold<u32, u32, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:22: 33:34], [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:34:23: 34:39]>::{closure#0}]>::{closure#0}]>::{closure#0}
+
+Check 95: <std::iter::TakeWhile<I, P> as std::iter::Iterator>::try_fold::check::<'_, u32, u32, std::ops::try_trait::NeverShortCircuit<u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:26: 32:38], [closure@std::ops::try_trait::NeverShortCircuit<u32>::wrap_mut_2<u32, u32, [closure@std::iter::adapters::filter::filter_fold<u32, u32, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:22: 33:34], [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:34:23: 34:39]>::{closure#0}]>::{closure#0}]>::{closure#0}.pointer_dereference.10
+- Status: SUCCESS
+- Description: "dereference failure: dead object"
+- Location: ../../../.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/adapters/take_while.rs:82:21 in function <std::iter::TakeWhile<I, P> as std::iter::Iterator>::try_fold::check::<'_, u32, u32, std::ops::try_trait::NeverShortCircuit<u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:26: 32:38], [closure@std::ops::try_trait::NeverShortCircuit<u32>::wrap_mut_2<u32, u32, [closure@std::iter::adapters::filter::filter_fold<u32, u32, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:22: 33:34], [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:34:23: 34:39]>::{closure#0}]>::{closure#0}]>::{closure#0}
+
+Check 96: <std::iter::TakeWhile<I, P> as std::iter::Iterator>::try_fold::check::<'_, u32, u32, std::ops::try_trait::NeverShortCircuit<u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:26: 32:38], [closure@std::ops::try_trait::NeverShortCircuit<u32>::wrap_mut_2<u32, u32, [closure@std::iter::adapters::filter::filter_fold<u32, u32, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:22: 33:34], [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:34:23: 34:39]>::{closure#0}]>::{closure#0}]>::{closure#0}.pointer_dereference.11
+- Status: SUCCESS
+- Description: "dereference failure: pointer outside object bounds"
+- Location: ../../../.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/adapters/take_while.rs:82:21 in function <std::iter::TakeWhile<I, P> as std::iter::Iterator>::try_fold::check::<'_, u32, u32, std::ops::try_trait::NeverShortCircuit<u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:26: 32:38], [closure@std::ops::try_trait::NeverShortCircuit<u32>::wrap_mut_2<u32, u32, [closure@std::iter::adapters::filter::filter_fold<u32, u32, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:22: 33:34], [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:34:23: 34:39]>::{closure#0}]>::{closure#0}]>::{closure#0}
+
+Check 97: <std::iter::TakeWhile<I, P> as std::iter::Iterator>::try_fold::check::<'_, u32, u32, std::ops::try_trait::NeverShortCircuit<u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:26: 32:38], [closure@std::ops::try_trait::NeverShortCircuit<u32>::wrap_mut_2<u32, u32, [closure@std::iter::adapters::filter::filter_fold<u32, u32, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:22: 33:34], [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:34:23: 34:39]>::{closure#0}]>::{closure#0}]>::{closure#0}.pointer_dereference.12
+- Status: SUCCESS
+- Description: "dereference failure: invalid integer address"
+- Location: ../../../.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/adapters/take_while.rs:82:21 in function <std::iter::TakeWhile<I, P> as std::iter::Iterator>::try_fold::check::<'_, u32, u32, std::ops::try_trait::NeverShortCircuit<u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:26: 32:38], [closure@std::ops::try_trait::NeverShortCircuit<u32>::wrap_mut_2<u32, u32, [closure@std::iter::adapters::filter::filter_fold<u32, u32, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:22: 33:34], [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:34:23: 34:39]>::{closure#0}]>::{closure#0}]>::{closure#0}
+
+Check 98: <std::iter::TakeWhile<I, P> as std::iter::Iterator>::try_fold::check::<'_, u32, u32, std::ops::try_trait::NeverShortCircuit<u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:26: 32:38], [closure@std::ops::try_trait::NeverShortCircuit<u32>::wrap_mut_2<u32, u32, [closure@std::iter::adapters::filter::filter_fold<u32, u32, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:22: 33:34], [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:34:23: 34:39]>::{closure#0}]>::{closure#0}]>::{closure#0}.pointer_dereference.13
+- Status: SUCCESS
+- Description: "dereference failure: pointer NULL"
+- Location: ../../../.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/adapters/take_while.rs:82:21 in function <std::iter::TakeWhile<I, P> as std::iter::Iterator>::try_fold::check::<'_, u32, u32, std::ops::try_trait::NeverShortCircuit<u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:26: 32:38], [closure@std::ops::try_trait::NeverShortCircuit<u32>::wrap_mut_2<u32, u32, [closure@std::iter::adapters::filter::filter_fold<u32, u32, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:22: 33:34], [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:34:23: 34:39]>::{closure#0}]>::{closure#0}]>::{closure#0}
+
+Check 99: <std::iter::TakeWhile<I, P> as std::iter::Iterator>::try_fold::check::<'_, u32, u32, std::ops::try_trait::NeverShortCircuit<u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:26: 32:38], [closure@std::ops::try_trait::NeverShortCircuit<u32>::wrap_mut_2<u32, u32, [closure@std::iter::adapters::filter::filter_fold<u32, u32, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:22: 33:34], [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:34:23: 34:39]>::{closure#0}]>::{closure#0}]>::{closure#0}.pointer_dereference.14
+- Status: SUCCESS
+- Description: "dereference failure: pointer invalid"
+- Location: ../../../.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/adapters/take_while.rs:82:21 in function <std::iter::TakeWhile<I, P> as std::iter::Iterator>::try_fold::check::<'_, u32, u32, std::ops::try_trait::NeverShortCircuit<u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:26: 32:38], [closure@std::ops::try_trait::NeverShortCircuit<u32>::wrap_mut_2<u32, u32, [closure@std::iter::adapters::filter::filter_fold<u32, u32, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:22: 33:34], [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:34:23: 34:39]>::{closure#0}]>::{closure#0}]>::{closure#0}
+
+Check 100: <std::iter::TakeWhile<I, P> as std::iter::Iterator>::try_fold::check::<'_, u32, u32, std::ops::try_trait::NeverShortCircuit<u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:26: 32:38], [closure@std::ops::try_trait::NeverShortCircuit<u32>::wrap_mut_2<u32, u32, [closure@std::iter::adapters::filter::filter_fold<u32, u32, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:22: 33:34], [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:34:23: 34:39]>::{closure#0}]>::{closure#0}]>::{closure#0}.pointer_dereference.15
+- Status: SUCCESS
+- Description: "dereference failure: deallocated dynamic object"
+- Location: ../../../.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/adapters/take_while.rs:82:21 in function <std::iter::TakeWhile<I, P> as std::iter::Iterator>::try_fold::check::<'_, u32, u32, std::ops::try_trait::NeverShortCircuit<u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:26: 32:38], [closure@std::ops::try_trait::NeverShortCircuit<u32>::wrap_mut_2<u32, u32, [closure@std::iter::adapters::filter::filter_fold<u32, u32, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:22: 33:34], [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:34:23: 34:39]>::{closure#0}]>::{closure#0}]>::{closure#0}
+
+Check 101: <std::iter::TakeWhile<I, P> as std::iter::Iterator>::try_fold::check::<'_, u32, u32, std::ops::try_trait::NeverShortCircuit<u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:26: 32:38], [closure@std::ops::try_trait::NeverShortCircuit<u32>::wrap_mut_2<u32, u32, [closure@std::iter::adapters::filter::filter_fold<u32, u32, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:22: 33:34], [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:34:23: 34:39]>::{closure#0}]>::{closure#0}]>::{closure#0}.pointer_dereference.16
+- Status: SUCCESS
+- Description: "dereference failure: dead object"
+- Location: ../../../.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/adapters/take_while.rs:82:21 in function <std::iter::TakeWhile<I, P> as std::iter::Iterator>::try_fold::check::<'_, u32, u32, std::ops::try_trait::NeverShortCircuit<u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:26: 32:38], [closure@std::ops::try_trait::NeverShortCircuit<u32>::wrap_mut_2<u32, u32, [closure@std::iter::adapters::filter::filter_fold<u32, u32, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:22: 33:34], [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:34:23: 34:39]>::{closure#0}]>::{closure#0}]>::{closure#0}
+
+Check 102: <std::iter::TakeWhile<I, P> as std::iter::Iterator>::try_fold::check::<'_, u32, u32, std::ops::try_trait::NeverShortCircuit<u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:26: 32:38], [closure@std::ops::try_trait::NeverShortCircuit<u32>::wrap_mut_2<u32, u32, [closure@std::iter::adapters::filter::filter_fold<u32, u32, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:22: 33:34], [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:34:23: 34:39]>::{closure#0}]>::{closure#0}]>::{closure#0}.pointer_dereference.17
+- Status: SUCCESS
+- Description: "dereference failure: pointer outside object bounds"
+- Location: ../../../.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/adapters/take_while.rs:82:21 in function <std::iter::TakeWhile<I, P> as std::iter::Iterator>::try_fold::check::<'_, u32, u32, std::ops::try_trait::NeverShortCircuit<u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:26: 32:38], [closure@std::ops::try_trait::NeverShortCircuit<u32>::wrap_mut_2<u32, u32, [closure@std::iter::adapters::filter::filter_fold<u32, u32, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:22: 33:34], [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:34:23: 34:39]>::{closure#0}]>::{closure#0}]>::{closure#0}
+
+Check 103: <std::iter::TakeWhile<I, P> as std::iter::Iterator>::try_fold::check::<'_, u32, u32, std::ops::try_trait::NeverShortCircuit<u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:26: 32:38], [closure@std::ops::try_trait::NeverShortCircuit<u32>::wrap_mut_2<u32, u32, [closure@std::iter::adapters::filter::filter_fold<u32, u32, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:22: 33:34], [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:34:23: 34:39]>::{closure#0}]>::{closure#0}]>::{closure#0}.pointer_dereference.18
+- Status: SUCCESS
+- Description: "dereference failure: invalid integer address"
+- Location: ../../../.rustup/toolchains/nightly-2023-04-29-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/adapters/take_while.rs:82:21 in function <std::iter::TakeWhile<I, P> as std::iter::Iterator>::try_fold::check::<'_, u32, u32, std::ops::try_trait::NeverShortCircuit<u32>, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:32:26: 32:38], [closure@std::ops::try_trait::NeverShortCircuit<u32>::wrap_mut_2<u32, u32, [closure@std::iter::adapters::filter::filter_fold<u32, u32, [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:33:22: 33:34], [closure@tests/bookrunner/books/Rust by Example/Functions/Higher Order Functions/7.rs:34:23: 34:39]>::{closure#0}]>::{closure#0}]>::{closure#0}
+
+
+SUMMARY:
+** 0 of 103 failed (2 unreachable)
+
+VERIFICATION:- SUCCESSFUL
+Verification Time: 5.9007387s
+
+              </xmp>
+            </div><!-- class="output-box" -->
+            
+          
+
+          
+          <div class="output-box"><xmp>stderr:
+            
+warning: Found the following unsupported constructs:
+- caller_location (1)
+- foreign function (1)
+
+Verification will fail if one or more of these constructs is reachable.
+See https://model-checking.github.io/kani/rust-feature-support.html for more details.
+
+warning: 1 warning emitted
+
+            </xmp>
+          </div><!-- class="output-box" -->
+          
+
+        </div><!-- class="command-content" -->
+      </div><!-- class="fail" -->
+    </div><!-- id="command-table" -->
+    
+
+  </div><!-- class="stage" -->
+  
+
+
+</div><!-- id="content" -->
+</body>
+</html>
