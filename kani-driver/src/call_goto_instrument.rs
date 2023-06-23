@@ -38,7 +38,7 @@ impl KaniSession {
         }
 
         for function in &harness.contracts {
-            self.enforce_contract(output, &function)?;
+            self.enforce_contract(harness, output, &function)?;
         }
 
         if self.args.checks.undefined_function_on() {
@@ -165,9 +165,16 @@ impl KaniSession {
     }
 
     /// Make CBMC enforce a function contract.
-    pub fn enforce_contract(&self, file: &Path, function: &str) -> Result<()> {
+    pub fn enforce_contract(
+        &self,
+        harness: &HarnessMetadata,
+        file: &Path,
+        function: &str,
+    ) -> Result<()> {
         println!("enforcing {function} contract");
         self.call_goto_instrument(vec![
+            "--dfcc".into(),
+            (&harness.mangled_name).into(),
             "--enforce-contract".into(),
             function.into(),
             file.into(),

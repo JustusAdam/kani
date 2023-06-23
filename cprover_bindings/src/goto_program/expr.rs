@@ -168,15 +168,24 @@ pub enum ExprValue {
     Vector {
         elems: Vec<Expr>,
     },
+    /// A special expression type used in `assigns` contract clauses. See
+    /// <https://diffblue.github.io/cbmc/contracts-assigns.html>
+    ConditionalTargetGroup {
+        condition: Box<Expr>,
+        targets: Vec<MemoryTarget>,
+    },
 }
 
-/// The equivalent of a "mathematical function" in CBMC but spiritually it is more like a function object.
-///
-/// This is only used to implement function contracts and values of this sort are otherwise not constructible.
+/// A target of an assigns clause. Used in [`ExprValue::ConditonalTargetGroup`]. See
+/// also <https://diffblue.github.io/cbmc/contracts-assigns.html>
 #[derive(Debug, Clone)]
-pub struct Lambda {
-    pub arguments: Vec<(InternedString, Type)>,
-    pub body: Expr,
+pub enum MemoryTarget {
+    /// lvalue-expr
+    Lvalue(Expr),
+    // | __CPROVER_typed_target(lvalue-expr)
+    // | __CPROVER_object_whole(ptr-expr)
+    // | __CPROVER_object_from(ptr-expr)
+    // | __CPROVER_object_upto(ptr-expr, uint-expr)
 }
 
 /// Binary operators. The names are the same as in the Irep representation.
@@ -910,6 +919,11 @@ impl Expr {
         assert_eq!(typ.lookup_field_type(field, symbol_table).as_ref(), Some(value.typ()));
         let typ = typ.aggr_tag().unwrap();
         expr!(Union { value, field }, typ)
+    }
+
+    /// Create a conditional target group with this expression as the condition
+    pub fn with_target_group(self, targets: Vec<MemoryTarget>) -> Self {
+        expr!(ConditionalTargetGroup { condition: Box::new(self), targets }, Type::Empty)
     }
 }
 

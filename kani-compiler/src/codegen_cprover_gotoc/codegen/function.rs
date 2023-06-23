@@ -250,6 +250,13 @@ impl<'tcx> GotocCtx<'tcx> {
     fn as_goto_contract(&mut self, fn_contract: &GFnContract<Instance<'tcx>>) -> Contract {
         use rustc_middle::mir;
         let mut handle_contract_expr = |instance| {
+            let goto_annotated_fn_name = self.current_fn().name();
+            let goto_annotated_fn_typ = self
+                .symbol_table
+                .lookup(goto_annotated_fn_name)
+                .expect("Function must have been declared")
+                .typ
+                .clone();
             let mir = self.current_fn().mir();
             assert!(mir.spread_arg.is_none());
             let func_expr = self.codegen_func_expr(instance, None);
@@ -261,25 +268,18 @@ impl<'tcx> GotocCtx<'tcx> {
             let mir_operands: Vec<_> =
                 mir_arguments.iter().map(|l| mir::Operand::Copy((*l).into())).collect();
             let mut arguments = self.codegen_funcall_args(&mir_operands, true);
-            let goto_argument_types: Vec<_> = [mir::RETURN_PLACE]
-                .into_iter()
-                .chain(mir_arguments.iter().copied())
-                .map(|a| self.codegen_ty(self.monomorphize(mir.local_decls()[a].ty)))
-                .collect();
 
             mir_arguments.insert(0, return_arg);
+            let return_var_name = self.codegen_var_name(&return_arg);
             arguments.push(Expr::symbol_expression(
-                self.codegen_var_name(&return_arg),
-                goto_argument_types.first().unwrap().clone(),
+                &return_var_name,
+                goto_annotated_fn_typ.return_type().expect("No return type found").clone(),
             ));
-            Lambda {
-                arguments: mir_arguments
-                    .into_iter()
-                    .map(|l| self.codegen_var_name(&l).into())
-                    .zip(goto_argument_types)
-                    .collect(),
-                body: func_expr.call(arguments).cast_to(Type::Bool),
-            }
+            Lambda::as_contract_for(
+                &goto_annotated_fn_typ,
+                Some(return_var_name.into()),
+                func_expr.call(arguments).cast_to(Type::Bool),
+            )
         };
 
         let requires =
@@ -303,7 +303,31 @@ impl<'tcx> GotocCtx<'tcx> {
         self.set_current_fn(instance);
         let goto_contract = self.as_goto_contract(contract);
         let name = self.current_fn().name();
-        self.symbol_table.attach_contract(name, goto_contract);
+
+        // CBMC has two ways of attaching the contract and it seems the
+        // difference is whether dfcc is used or not. With dfcc it's stored in
+        // `contract::<fn name>`, otherwise directly on the type of the
+        // function.
+        let use_dfcc = true;
+
+        let contract_target_name = if use_dfcc {
+            let contract_sym_name = format!("contract::{}", name);
+            self.ensure(&contract_sym_name, |ctx, fname| {
+                Symbol::function(
+                    fname,
+                    ctx.fn_typ(),
+                    None,
+                    ctx.current_fn().readable_name(),
+                    ctx.codegen_span(&ctx.current_fn().mir().span),
+                )
+                .with_is_property(true)
+            });
+            contract_sym_name
+        } else {
+            name
+        };
+
+        self.symbol_table.attach_contract(contract_target_name, goto_contract);
         self.reset_current_fn()
     }
 

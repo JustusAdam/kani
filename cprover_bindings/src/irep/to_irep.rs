@@ -5,12 +5,11 @@
 use super::super::goto_program;
 use super::super::MachineModel;
 use super::{Irep, IrepId};
-use crate::goto_program::Lambda;
 use crate::linear_map;
 use crate::InternedString;
 use goto_program::{
-    BinaryOperator, CIntType, DatatypeComponent, Expr, ExprValue, Location, Parameter,
-    SelfOperator, Stmt, StmtBody, SwitchCase, SymbolValues, Type, UnaryOperator,
+    BinaryOperator, CIntType, DatatypeComponent, Expr, ExprValue, Lambda, Location, MemoryTarget,
+    Parameter, SelfOperator, Stmt, StmtBody, SwitchCase, SymbolValues, Type, UnaryOperator,
 };
 
 pub trait ToIrep {
@@ -353,6 +352,26 @@ impl ToIrep for ExprValue {
                 sub: elems.iter().map(|x| x.to_irep(mm)).collect(),
                 named_sub: linear_map![],
             },
+            ExprValue::ConditionalTargetGroup { condition, targets } => Irep {
+                id: IrepId::ConditionalTargetGroup,
+                sub: vec![
+                    condition.to_irep(mm),
+                    Irep {
+                        id: IrepId::ExpressionList,
+                        sub: targets.iter().map(|t| t.to_irep(mm)).collect(),
+                        named_sub: linear_map!(),
+                    },
+                ],
+                named_sub: linear_map![],
+            },
+        }
+    }
+}
+
+impl ToIrep for MemoryTarget {
+    fn to_irep(&self, mm: &MachineModel) -> Irep {
+        match self {
+            MemoryTarget::Lvalue(e) => e.to_irep(mm),
         }
     }
 }
@@ -509,9 +528,13 @@ impl ToIrep for Lambda {
         let (ops_ireps, types) = self
             .arguments
             .iter()
-            .map(|(i, ty)| {
-                let ty_rep = ty.to_irep(mm);
-                (Irep::symbol(*i).with_named_sub(IrepId::Type, ty_rep.clone()), ty_rep)
+            .map(|param| {
+                let ty_rep = param.typ().to_irep(mm);
+                (
+                    Irep::symbol(param.identifier().unwrap_or("_".into()))
+                        .with_named_sub(IrepId::Type, ty_rep.clone()),
+                    ty_rep,
+                )
             })
             .unzip();
         let typ = Irep {
@@ -536,6 +559,14 @@ impl goto_program::Symbol {
             }
             for ensures in &contract.ensures {
                 typ = typ.with_named_sub(IrepId::CSpecEnsures, ensures.to_irep(mm));
+            }
+            if contract.assigns.is_empty() {
+                let assigns = Lambda::as_contract_for(
+                    &self.typ,
+                    None,
+                    Expr::c_true().with_target_group(vec![]),
+                );
+                typ = typ.with_named_sub(IrepId::CSpecAssigns, assigns.to_irep(mm));
             }
             for assigns in &contract.assigns {
                 typ = typ.with_named_sub(IrepId::CSpecAssigns, assigns.to_irep(mm));

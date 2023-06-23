@@ -1,7 +1,7 @@
 // Copyright Kani Contributors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 use super::super::utils::aggr_tag;
-use super::{DatatypeComponent, Expr, Lambda, Location, Parameter, Stmt, Type};
+use super::{DatatypeComponent, Expr, Location, Parameter, Stmt, Type};
 use crate::{InternStringOption, InternedString};
 
 /// Based off the CBMC symbol implementation here:
@@ -44,6 +44,36 @@ pub struct Symbol {
     pub is_thread_local: bool,
     pub is_volatile: bool,
     pub is_weak: bool,
+}
+
+/// The equivalent of a "mathematical function" in CBMC but spiritually it is more like a function object.
+///
+/// This is only used to implement function contracts and values of this sort are otherwise not constructible.
+#[derive(Debug, Clone)]
+pub struct Lambda {
+    pub arguments: Vec<Parameter>,
+    pub body: Expr,
+}
+
+impl Lambda {
+    pub fn as_contract_for(
+        fn_ty: &Type,
+        return_var_name: Option<InternedString>,
+        body: Expr,
+    ) -> Self {
+        let arguments = match fn_ty {
+            Type::Code { parameters, return_type } => {
+                [Parameter::new(None, return_var_name, (**return_type).clone())]
+                    .into_iter()
+                    .chain(parameters.iter().cloned())
+                    .collect()
+            }
+            _ => panic!(
+                "Contract lambdas can only be generated for `Code` types, received {fn_ty:?}"
+            ),
+        };
+        Self { arguments, body }
+    }
 }
 
 /// The CBMC representation of a function contract with three types of clauses.
@@ -350,6 +380,11 @@ impl Symbol {
 
     pub fn with_is_hidden(mut self, hidden: bool) -> Symbol {
         self.is_auxiliary = hidden;
+        self
+    }
+
+    pub fn with_is_property(mut self, v: bool) -> Self {
+        self.is_property = v;
         self
     }
 }
