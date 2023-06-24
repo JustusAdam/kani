@@ -560,14 +560,6 @@ impl goto_program::Symbol {
             for ensures in &contract.ensures {
                 typ = typ.with_named_sub(IrepId::CSpecEnsures, ensures.to_irep(mm));
             }
-            if contract.assigns.is_empty() {
-                let assigns = Lambda::as_contract_for(
-                    &self.typ,
-                    None,
-                    Expr::c_true().with_target_group(vec![]),
-                );
-                typ = typ.with_named_sub(IrepId::CSpecAssigns, assigns.to_irep(mm));
-            }
             for assigns in &contract.assigns {
                 typ = typ.with_named_sub(IrepId::CSpecAssigns, assigns.to_irep(mm));
             }

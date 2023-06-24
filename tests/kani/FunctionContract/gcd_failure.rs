@@ -1,3 +1,6 @@
+// Copyright Kani Contributors
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+// kani-verify-fail
 type T = u8;
 
 /// Euclid's algorithm for calculating the GCD of two numbers
@@ -19,7 +22,8 @@ fn gcd(x: T, y: T) -> T {
         }
 
         max = min;
-        min = res;
+        // Added a +1 below to make it no longer satisfy the contract
+        min = res + 1;
     }
 }
 
@@ -54,6 +58,7 @@ impl Frac {
 #[kani::proof]
 #[kani::unwind(12)]
 fn main() {
+    let _ = Box::new(9_usize);
     let num: T = kani::any();
     let den: T = kani::any();
     kani::assume(num != 0);
