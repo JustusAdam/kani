@@ -722,7 +722,11 @@ impl Expr {
     /// `({ op1; op2; ...})`
     pub fn statement_expression(ops: Vec<Stmt>, typ: Type) -> Self {
         assert!(!ops.is_empty());
-        assert_eq!(ops.last().unwrap().get_expression().unwrap().typ, typ);
+        assert_eq!(
+            ops.last().and_then(|o| o.get_expression()).map(|e| &e.typ),
+            Some(&typ),
+            "Expected type {typ:?} for last expression in {ops:?}"
+        );
         expr!(StatementExpression { statements: ops }, typ)
     }
 

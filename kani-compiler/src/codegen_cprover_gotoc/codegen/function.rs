@@ -5,7 +5,9 @@
 
 use crate::codegen_cprover_gotoc::GotocCtx;
 use crate::kani_middle::contracts::GFnContract;
-use cbmc::goto_program::{Contract, Expr, Lambda, Stmt, Symbol, Type};
+use cbmc::goto_program::{
+    Contract, Expr, Lambda, Location, Stmt, StmtBody, Symbol, SymbolValues, Type,
+};
 use cbmc::InternString;
 use rustc_middle::mir::traversal::reverse_postorder;
 use rustc_middle::mir::{Body, HasLocalDecls, Local};
@@ -223,44 +225,111 @@ impl<'tcx> GotocCtx<'tcx> {
         );
     }
 
+    #[allow(unused)]
     /// A spec lambda in GOTO receives as its first argument the return value of
     /// the annotated function. However at the top level we must receive `self`
     /// as first argument, because rust requires it. As a result the generated
     /// lambda takes the return value as first argument and then immediately
     /// calls the generated spec function, but passing the return value as the
     /// last argument.
-    fn as_goto_contract(&mut self, fn_contract: &GFnContract<Instance<'tcx>>) -> Contract {
-        use rustc_middle::mir;
+    // fn as_goto_contract(&mut self, fn_contract: &GFnContract<Instance<'tcx>>) -> Contract {
+    //     use rustc_middle::mir;
+    //     let mut handle_contract_expr = |instance| {
+    //         let mir = self.current_fn().mir();
+    //         assert!(!mir.spread_arg.is_some());
+    //         let func_expr = self.codegen_func_expr(instance, None);
+    //         let mut mir_arguments: Vec<_> =
+    //             std::iter::successors(Some(mir::RETURN_PLACE + 1), |i| Some(*i + 1))
+    //                 .take(mir.arg_count + 1) // one extra for return value
+    //                 .collect();
+    //         let return_arg = mir_arguments.pop().unwrap();
+    //         let mir_operands: Vec<_> =
+    //             mir_arguments.iter().map(|l| mir::Operand::Copy((*l).into())).collect();
+    //         let mut arguments = self.codegen_funcall_args(&mir_operands, true);
+    //         let goto_argument_types: Vec<_> = [mir::RETURN_PLACE]
+    //             .into_iter()
+    //             .chain(mir_arguments.iter().copied())
+    //             .map(|a| self.codegen_ty(self.monomorphize(mir.local_decls()[a].ty)))
+    //             .collect();
+
+    //         mir_arguments.insert(0, return_arg);
+    //         arguments.push(Expr::symbol_expression(
+    //             self.codegen_var_name(&return_arg),
+    //             goto_argument_types.first().unwrap().clone(),
+    //         ));
+    //         Lambda {
+    //             arguments: mir_arguments
+    //                 .into_iter()
+    //                 .map(|l| self.codegen_var_name(&l).into())
+    //                 .zip(goto_argument_types)
+    //                 .collect(),
+    //             body: func_expr.call(arguments).cast_to(Type::Bool),
+    //         }
+    //     };
+
+    //     let requires =
+    //         fn_contract.requires().iter().copied().map(&mut handle_contract_expr).collect();
+    //     let ensures =
+    //         fn_contract.ensures().iter().copied().map(&mut handle_contract_expr).collect();
+    //     Contract::new(requires, ensures, vec![])
+    // }
+
+    fn as_inlined_goto_contract(&mut self, fn_contract: &GFnContract<Instance<'tcx>>) -> Contract {
         let mut handle_contract_expr = |instance| {
+            let instance_fn_name = self.symbol_name(instance);
+
+            let instance_sym = self.symbol_table.delete(instance_fn_name);
+
+            assert!(
+                instance_sym.is_function_definition(),
+                "Contract function must have been defined"
+            );
+
+            let typ = instance_sym.typ;
+
+            let (params, return_type) = match typ {
+                Type::Code { mut parameters, return_type } => {
+                    let result_ty =
+                        parameters.pop().expect("Function must have at least result type argument");
+                    parameters.insert(0, result_ty);
+                    (parameters, return_type)
+                }
+                _ => unreachable!("Expected function type, got {typ:?}"),
+            };
+
             let mir = self.current_fn().mir();
             assert!(!mir.spread_arg.is_some());
-            let func_expr = self.codegen_func_expr(instance, None);
-            let mut mir_arguments: Vec<_> =
-                std::iter::successors(Some(mir::RETURN_PLACE + 1), |i| Some(*i + 1))
-                    .take(mir.arg_count + 1) // one extra for return value
-                    .collect();
-            let return_arg = mir_arguments.pop().unwrap();
-            let mir_operands: Vec<_> =
-                mir_arguments.iter().map(|l| mir::Operand::Copy((*l).into())).collect();
-            let mut arguments = self.codegen_funcall_args(&mir_operands, true);
-            let goto_argument_types: Vec<_> = [mir::RETURN_PLACE]
-                .into_iter()
-                .chain(mir_arguments.iter().copied())
-                .map(|a| self.codegen_ty(self.monomorphize(mir.local_decls()[a].ty)))
-                .collect();
 
-            mir_arguments.insert(0, return_arg);
-            arguments.push(Expr::symbol_expression(
-                self.codegen_var_name(&return_arg),
-                goto_argument_types.first().unwrap().clone(),
-            ));
+            let mut stmt = match instance_sym.value {
+                SymbolValues::Stmt(stmt) => stmt,
+                _ => unreachable!(),
+            };
+
+            let stmts = match stmt.into_body() {
+                StmtBody::Block(mut stmts) => {
+                    let mut ret_stmt = stmts.pop().expect("Need at least return statment");
+
+                    // TODO make this recursive with a visitor
+                    assert!(stmts.iter().all(|s| !matches!(s.body(), StmtBody::Return(_))));
+
+                    let new_last_stmt = match ret_stmt.into_body() {
+                        StmtBody::Return(Some(expr)) => {
+                            Stmt::code_expression(expr.cast_to(Type::bool()), Location::none())
+                        }
+                        _ => unreachable!("Expected return statement with value"),
+                    };
+                    stmts.push(new_last_stmt);
+                    stmts
+                }
+                _ => unreachable!("Expected block statement"),
+            };
+
             Lambda {
-                arguments: mir_arguments
-                    .into_iter()
-                    .map(|l| self.codegen_var_name(&l).into())
-                    .zip(goto_argument_types)
+                arguments: params
+                    .iter()
+                    .map(|param| (param.base_name().unwrap(), param.typ().clone()))
                     .collect(),
-                body: func_expr.call(arguments).cast_to(Type::Bool),
+                body: Expr::statement_expression(stmts, Type::bool()),
             }
         };
 
@@ -279,7 +348,7 @@ impl<'tcx> GotocCtx<'tcx> {
         // This should be safe, since the contract is pretty much evaluated as
         // though it was the first (or last) assertion in the function.
         self.set_current_fn(instance);
-        let goto_contract = self.as_goto_contract(contract);
+        let goto_contract = self.as_inlined_goto_contract(contract);
         let name = self.current_fn().name();
         self.symbol_table.attach_contract(name, goto_contract);
         self.reset_current_fn()

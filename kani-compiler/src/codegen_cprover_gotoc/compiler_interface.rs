@@ -124,18 +124,6 @@ impl GotocCodegenBackend {
                     }
                 }
 
-                // Gets its own loop, because the functions used in the contract
-                // expressions must have been declared before
-                for (item, contract) in &items_with_contracts {
-                    if let Some(contract) = contract {
-                        let instance = match item {
-                            MonoItem::Fn(instance) => *instance,
-                            _ => unreachable!(),
-                        };
-                        gcx.attach_contract(instance, contract);
-                    }
-                }
-
                 // then we move on to codegen
                 for item in &items {
                     match *item {
@@ -158,6 +146,19 @@ impl GotocCodegenBackend {
                             );
                         }
                         MonoItem::GlobalAsm(_) => {} // We have already warned above
+                    }
+                }
+
+                // Gets its own loop, because the functions used in the contract
+                // expressions must have been declared and created before since
+                // we rip out the implementation from the contract function
+                for (item, contract) in &items_with_contracts {
+                    if let Some(contract) = contract {
+                        let instance = match item {
+                            MonoItem::Fn(instance) => *instance,
+                            _ => unreachable!(),
+                        };
+                        gcx.attach_contract(instance, contract);
                     }
                 }
             },
