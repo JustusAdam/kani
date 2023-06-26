@@ -13,7 +13,12 @@ use rustc_middle::ty::{Instance, InstanceDef, TyCtxt};
 use super::{attributes::extract_harness_attributes, SourceLocation};
 
 /// Create the harness metadata for a proof harness for a given function.
-pub fn gen_proof_metadata(tcx: TyCtxt, def_id: DefId, base_name: &Path) -> HarnessMetadata {
+pub fn gen_proof_metadata(
+    tcx: TyCtxt,
+    def_id: DefId,
+    base_name: &Path,
+    contracts: Vec<String>,
+) -> HarnessMetadata {
     let attributes = extract_harness_attributes(tcx, def_id);
     let pretty_name = tcx.def_path_str(def_id);
     // Main function a special case in order to support `--function main`
@@ -36,10 +41,10 @@ pub fn gen_proof_metadata(tcx: TyCtxt, def_id: DefId, base_name: &Path) -> Harne
         original_file: loc.filename,
         original_start_line: loc.start_line,
         original_end_line: loc.end_line,
-        attributes: attributes.unwrap_or_default(),
+        attributes,
         // TODO: This no longer needs to be an Option.
         goto_file: Some(model_file),
-        contracts: vec![],
+        contracts,
     }
 }
 

@@ -226,6 +226,17 @@ impl Parameter {
     }
 }
 
+/// Constructor
+impl Parameter {
+    pub fn new<S: Into<InternedString>>(
+        base_name: Option<S>,
+        identifier: Option<S>,
+        typ: Type,
+    ) -> Self {
+        Self { base_name: base_name.map(Into::into), identifier: identifier.map(Into::into), typ }
+    }
+}
+
 impl CIntType {
     pub fn sizeof_in_bits(&self, st: &SymbolTable) -> u64 {
         match self {
@@ -543,10 +554,14 @@ impl Type {
         }
     }
 
+    /// Whether the type can be an lvalue.
+    ///
+    /// Note that this is different than a modifiable lvalue type which does not include arrays.
     pub fn can_be_lvalue(&self) -> bool {
         let concrete = self.unwrap_typedef();
         match concrete {
-            Bool
+            Array { .. }
+            | Bool
             | CBitField { .. }
             | CInteger(_)
             | Double
@@ -561,8 +576,7 @@ impl Type {
             | Unsignedbv { .. }
             | Vector { .. } => true,
 
-            Array { .. }
-            | Code { .. }
+            Code { .. }
             | Constructor
             | Empty
             | FlexibleArray { .. }
@@ -766,7 +780,7 @@ impl Type {
         recurse(self.unwrap_typedef(), st)
     }
 
-    /// Get the fields (including padding) in self.  
+    /// Get the fields (including padding) in self.
     /// For StructTag or UnionTag, lookup the definition in the symbol table.
     pub fn lookup_components<'a>(&self, st: &'a SymbolTable) -> Option<&'a Vec<DatatypeComponent>> {
         self.type_name().and_then(|aggr_name| st.lookup(aggr_name)).and_then(|x| x.typ.components())

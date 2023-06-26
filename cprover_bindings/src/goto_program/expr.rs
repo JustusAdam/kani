@@ -175,6 +175,12 @@ pub enum ExprValue {
         body: Expr,
     },
     Old(Expr),
+    /// A special expression type used in `assigns` contract clauses. See
+    /// <https://diffblue.github.io/cbmc/contracts-assigns.html>
+    ConditionalTargetGroup {
+        condition: Box<Expr>,
+        targets: Vec<MemoryTarget>,
+    },
 }
 
 #[derive(Clone, Debug, Copy, Eq, PartialEq, PartialOrd)]
@@ -183,10 +189,16 @@ pub enum Quantifier {
     Exists,
 }
 
+/// A target of an assigns clause. Used in [`ExprValue::ConditonalTargetGroup`]. See
+/// also <https://diffblue.github.io/cbmc/contracts-assigns.html>
 #[derive(Debug, Clone)]
-pub struct Lambda {
-    pub arguments: Vec<(InternedString, Type)>,
-    pub body: Expr,
+pub enum MemoryTarget {
+    /// lvalue-expr
+    Lvalue(Expr),
+    // | __CPROVER_typed_target(lvalue-expr)
+    // | __CPROVER_object_whole(ptr-expr)
+    // | __CPROVER_object_from(ptr-expr)
+    // | __CPROVER_object_upto(ptr-expr, uint-expr)
 }
 
 /// Binary operators. The names are the same as in the Irep representation.
@@ -881,10 +893,6 @@ impl Expr {
     /// Initializer for a zero sized type (ZST).
     /// Since this is a ZST, we call nondet to simplify everything.
     pub fn init_unit(typ: Type, symbol_table: &SymbolTable) -> Self {
-        assert!(
-            typ.is_struct_tag(),
-            "Zero sized types should be represented as struct: but found: {typ:?}"
-        );
         assert_eq!(typ.sizeof_in_bits(symbol_table), 0);
         Expr::nondet(typ)
     }
@@ -932,6 +940,11 @@ impl Expr {
         assert_eq!(typ.lookup_field_type(field, symbol_table).as_ref(), Some(value.typ()));
         let typ = typ.aggr_tag().unwrap();
         expr!(Union { value, field }, typ)
+    }
+
+    /// Create a conditional target group with this expression as the condition
+    pub fn with_target_group(self, targets: Vec<MemoryTarget>) -> Self {
+        expr!(ConditionalTargetGroup { condition: Box::new(self), targets }, Type::Empty)
     }
 }
 

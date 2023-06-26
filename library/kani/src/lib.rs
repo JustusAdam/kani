@@ -80,7 +80,6 @@ pub fn forall<T: Arbitrary, F: Fn(T) -> bool>(f: F) -> bool {
 pub fn exists<T: Arbitrary, F: Fn(T) -> bool>(f: F) -> bool {
     let _ = f(todo!("`exists` cannot be used in regular execution"));
     false
-    
 }
 
 #[inline(never)]
@@ -90,6 +89,7 @@ pub fn old<T>(t: &T) -> T {
     unreachable!("`old` cannot be used in regular execution");
 }
 
+/// If the `premise` is true, so must be the `conclusion`
 pub fn implies(premise: bool, conclusion: bool) -> bool {
     !premise || conclusion
 }

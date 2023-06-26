@@ -5,16 +5,14 @@
 
 use crate::codegen_cprover_gotoc::GotocCtx;
 use crate::kani_middle::analysis;
-use crate::kani_middle::attributes::is_proof_harness;
 use crate::kani_middle::attributes::is_test_harness_description;
-use crate::kani_middle::check_crate_items;
-use crate::kani_middle::check_reachable_items;
 use crate::kani_middle::contracts::GFnContract;
-use crate::kani_middle::metadata::{gen_proof_metadata, gen_test_metadata};
+use crate::kani_middle::metadata::gen_test_metadata;
 use crate::kani_middle::provide;
 use crate::kani_middle::reachability::{
     collect_reachable_items, filter_const_crate_items, filter_crate_items,
 };
+use crate::kani_middle::{check_reachable_items, dump_mir_items};
 use crate::kani_queries::{QueryDb, ReachabilityType};
 use cbmc::goto_program::Location;
 use cbmc::irep::goto_binary_serde::write_goto_binary_file;
@@ -34,27 +32,26 @@ use rustc_data_structures::fx::FxHashMap;
 use rustc_data_structures::temp_dir::MaybeTempDir;
 use rustc_errors::{ErrorGuaranteed, DEFAULT_LOCALE_RESOURCE};
 use rustc_hir::def_id::LOCAL_CRATE;
+use rustc_hir::definitions::DefPathHash;
 use rustc_metadata::fs::{emit_wrapper_file, METADATA_FILENAME};
 use rustc_metadata::EncodedMetadata;
 use rustc_middle::dep_graph::{WorkProduct, WorkProductId};
 use rustc_middle::mir::mono::MonoItem;
-use rustc_middle::mir::write_mir_pretty;
 use rustc_middle::ty::query::Providers;
-use rustc_middle::ty::{self, Instance, InstanceDef, TyCtxt};
+use rustc_middle::ty::{self, TyCtxt};
 use rustc_session::config::{CrateType, OutputFilenames, OutputType};
 use rustc_session::cstore::MetadataLoaderDyn;
 use rustc_session::output::out_filename;
 use rustc_session::Session;
-use rustc_span::def_id::DefId;
 use rustc_target::abi::Endian;
 use rustc_target::spec::PanicStrategy;
 use std::any::Any;
 use std::collections::BTreeMap;
+use std::collections::HashSet;
 use std::ffi::OsString;
 use std::fmt::Write;
 use std::fs::File;
 use std::io::BufWriter;
-use std::io::Write as IoWrite;
 use std::iter::FromIterator;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -73,6 +70,8 @@ pub struct GotocCodegenBackend {
     queries: Arc<Mutex<QueryDb>>,
 }
 
+type MonoContract<'tcx> = GFnContract<ty::Instance<'tcx>>;
+
 impl GotocCodegenBackend {
     pub fn new(queries: Arc<Mutex<QueryDb>>) -> Self {
         GotocCodegenBackend { queries }
@@ -85,7 +84,7 @@ impl GotocCodegenBackend {
         starting_items: &[MonoItem<'tcx>],
         symtab_goto: &Path,
         machine_model: &MachineModel,
-    ) -> (GotocCtx<'tcx>, Vec<(MonoItem<'tcx>, Option<GFnContract<Instance<'tcx>>>)>) {
+    ) -> (GotocCtx<'tcx>, Vec<(MonoItem<'tcx>, Option<MonoContract<'tcx>>)>) {
         let items_with_contracts = with_timer(
             || collect_reachable_items(tcx, starting_items),
             "codegen reachability analysis",
@@ -121,6 +120,18 @@ impl GotocCodegenBackend {
                             );
                         }
                         MonoItem::GlobalAsm(_) => {} // Ignore this. We have already warned about it.
+                    }
+                }
+
+                // Gets its own loop, because the functions used in the contract
+                // expressions must have been declared before
+                for (item, contract) in &items_with_contracts {
+                    if let Some(contract) = contract {
+                        let instance = match item {
+                            MonoItem::Fn(instance) => *instance,
+                            _ => unreachable!(),
+                        };
+                        gcx.attach_contract(instance, contract);
                     }
                 }
 
@@ -235,7 +246,6 @@ impl CodegenBackend for GotocCodegenBackend {
         let queries = self.queries.lock().unwrap().clone();
         check_target(tcx.sess);
         check_options(tcx.sess);
-        check_crate_items(tcx, queries.ignore_global_asm);
 
         // Codegen all items that need to be processed according to the selected reachability mode:
         //
@@ -249,26 +259,18 @@ impl CodegenBackend for GotocCodegenBackend {
         match reachability {
             ReachabilityType::Harnesses => {
                 // Cross-crate collecting of all items that are reachable from the crate harnesses.
-                let harnesses = filter_crate_items(tcx, |_, def_id| is_proof_harness(tcx, def_id));
+                let harnesses = queries.target_harnesses();
+                let mut items: HashSet<DefPathHash> = HashSet::with_capacity(harnesses.len());
+                items.extend(harnesses.into_iter());
+                let harnesses =
+                    filter_crate_items(tcx, |_, def_id| items.contains(&tcx.def_path_hash(def_id)));
                 for harness in harnesses {
-                    let mut metadata = gen_proof_metadata(tcx, harness.def_id(), &base_filename);
-                    let model_path = &metadata.goto_file.as_ref().unwrap();
+                    let model_path =
+                        queries.harness_model_path(&tcx.def_path_hash(harness.def_id())).unwrap();
                     let (gcx, items_with_contracts) =
                         self.codegen_items(tcx, &[harness], model_path, &results.machine_model);
-                    let items = items_with_contracts
-                        .into_iter()
-                        .map(|(i, contract)| {
-                            if let Some(_) = contract {
-                                let instance = match i {
-                                    MonoItem::Fn(f) => f,
-                                    _ => unreachable!(),
-                                };
-                                metadata.contracts.push(gcx.symbol_name(instance))
-                            }
-                            i
-                        })
-                        .collect();
-                    results.extend(gcx, items, Some(metadata));
+                    let items = items_with_contracts.into_iter().map(|(i, _contract)| i).collect();
+                    results.extend(gcx, items, None);
                 }
             }
             ReachabilityType::Tests => {
@@ -295,7 +297,7 @@ impl CodegenBackend for GotocCodegenBackend {
                 let items = items_with_contracts
                     .into_iter()
                     .map(|(i, contract)| {
-                        if let Some(_) = contract {
+                        if contract.is_some() {
                             let instance = match i {
                                 MonoItem::Fn(f) => f,
                                 _ => unreachable!(),
@@ -347,16 +349,18 @@ impl CodegenBackend for GotocCodegenBackend {
             // Print compilation report.
             results.print_report(tcx);
 
-            // In a workspace, cargo seems to be using the same file prefix to build a crate that is
-            // a package lib and also a dependency of another package.
-            // To avoid overriding the metadata for its verification, we skip this step when
-            // reachability is None, even because there is nothing to record.
-            write_file(
-                &base_filename,
-                ArtifactType::Metadata,
-                &results.generate_metadata(),
-                queries.output_pretty_json,
-            );
+            if reachability != ReachabilityType::Harnesses {
+                // In a workspace, cargo seems to be using the same file prefix to build a crate that is
+                // a package lib and also a dependency of another package.
+                // To avoid overriding the metadata for its verification, we skip this step when
+                // reachability is None, even because there is nothing to record.
+                write_file(
+                    &base_filename,
+                    ArtifactType::Metadata,
+                    &results.generate_metadata(),
+                    queries.output_pretty_json,
+                );
+            }
         }
         codegen_results(tcx, rustc_metadata, &results.machine_model)
     }
@@ -535,37 +539,6 @@ fn symbol_table_to_gotoc(tcx: &TyCtxt, base_path: &Path) -> PathBuf {
         tcx.sess.abort_if_errors();
     };
     output_filename
-}
-
-/// Print MIR for the reachable items if the `--emit mir` option was provided to rustc.
-fn dump_mir_items(tcx: TyCtxt, items: &[MonoItem]) {
-    /// Convert MonoItem into a DefId.
-    /// Skip stuff that we cannot generate the MIR items.
-    fn visible_item<'tcx>(item: &MonoItem<'tcx>) -> Option<(MonoItem<'tcx>, DefId)> {
-        match item {
-            // Exclude FnShims and others that cannot be dumped.
-            MonoItem::Fn(instance) if matches!(instance.def, InstanceDef::Item(..)) => {
-                Some((*item, instance.def_id()))
-            }
-            MonoItem::Fn(..) => None,
-            MonoItem::Static(def_id) => Some((*item, *def_id)),
-            MonoItem::GlobalAsm(_) => None,
-        }
-    }
-
-    if tcx.sess.opts.output_types.contains_key(&OutputType::Mir) {
-        // Create output buffer.
-        let outputs = tcx.output_filenames(());
-        let path = outputs.output_path(OutputType::Mir).with_extension("kani.mir");
-        let out_file = File::create(&path).unwrap();
-        let mut writer = BufWriter::new(out_file);
-
-        // For each def_id, dump their MIR
-        for (item, def_id) in items.iter().filter_map(visible_item) {
-            writeln!(writer, "// Item: {item:?}").unwrap();
-            write_mir_pretty(tcx, Some(def_id), &mut writer).unwrap();
-        }
-    }
 }
 
 pub fn write_file<T>(base_path: &Path, file_type: ArtifactType, source: &T, pretty: bool)

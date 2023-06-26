@@ -4,14 +4,10 @@
 
 #[kani::ensures(result == x)]
 fn max(x: u32, y: u32) -> u32 {
-    if x > y {
-        x
-    } else {
-        y
-    }
+    if x > y { x } else { y }
 }
 
 #[kani::proof]
 fn main() {
-    max(7, 6);
+    max(7, 9);
 }

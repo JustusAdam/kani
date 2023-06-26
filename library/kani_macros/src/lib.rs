@@ -89,21 +89,32 @@ pub fn derive_arbitrary(item: TokenStream) -> TokenStream {
     derive::expand_derive_arbitrary(item)
 }
 
+/// Add a precondition to this function.
+///
+/// This is part of the function contract API, together with [`ensures`].
+///
+/// The contents of the attribute is a condtition over the input values to the
+/// annotated function. All Rust syntax is supported, even calling other
+/// functions, but the computations must be side effect free, e.g. it cannot
+/// perform I/O or use mutable memory.
 #[proc_macro_attribute]
 pub fn requires(attr: TokenStream, item: TokenStream) -> TokenStream {
     attr_impl::requires(attr, item)
 }
 
+/// Add a postcondition to this function.
+///
+/// This is part of the function contract API, together with [`requires`].
+///
+/// The contents of the attribute is a condtition over the input values to the
+/// annotated function *and* its return value, accessible as a variable called
+/// `result`. All Rust syntax is supported, even calling other functions, but
+/// the computations must be side effect free, e.g. it cannot perform I/O or use
+/// mutable memory.
 #[proc_macro_attribute]
 pub fn ensures(attr: TokenStream, item: TokenStream) -> TokenStream {
     attr_impl::ensures(attr, item)
 }
-
-#[proc_macro_attribute]
-pub fn auto_harness(attr: TokenStream, item: TokenStream) -> TokenStream {
-    attr_impl::auto_harness(attr, item)
-}
-
 /// This module implements Kani attributes in a way that only Kani's compiler can understand.
 /// This code should only be activated when pre-building Kani's sysroot.
 #[cfg(kani_sysroot)]
@@ -118,6 +129,8 @@ mod sysroot {
 
     use proc_macro2::Ident;
 
+    /// Create a unique hash for a token stream (basically a [`std::hash::Hash`]
+    /// impl for `proc_macro2::TokenStream`).
     fn hash_of_token_stream<H: std::hash::Hasher>(
         hasher: &mut H,
         stream: proc_macro2::TokenStream,
@@ -221,6 +234,30 @@ mod sysroot {
         }
     }
 
+    /// Rewrites function contract annotations (`requires`, `ensures`) by lifing
+    /// the condition into a separate function. As an example: (using `ensures`)
+    ///
+    /// ```rs
+    /// #[kani::ensures(x < result)]
+    /// fn foo(x: u32) -> u32 { .. }
+    /// ```
+    ///
+    /// Is rewritten to
+    ///
+    /// ```rs
+    /// fn foo_enusres_<hash of foo>(x: u32, result: u32) {
+    ///     x < result
+    /// }
+    ///
+    /// #[kanitook::ensures = "foo_ensures_<hash of foo>"]
+    /// fn foo(x: u32) -> u32 { .. }
+    /// ```
+    ///
+    /// Note that CBMC's contracts always pass the return value (even for
+    /// `requires`) and so we also append it here.
+    ///
+    /// This macro is supposed to be called with the name of the procedural
+    /// macro it should generate, e.g. `requires_ensures(requires)`
     macro_rules! requires_ensures {
         ($name: ident) => {
             pub fn $name(attr: TokenStream, item: TokenStream) -> TokenStream {
@@ -298,45 +335,6 @@ mod sysroot {
         Ident::new(&identifier, proc_macro2::Span::mixed_site())
     }
 
-    pub fn auto_harness(attr: TokenStream, item: TokenStream) -> TokenStream {
-        use proc_macro2::Span;
-        use syn::{punctuated::Punctuated, token::Comma, Expr, ExprPath, FnArg};
-        assert!(attr.is_empty(), "#[kani::auto_harness] does not take any arguments currently");
-        let hash = short_hash_of_token_stream(&item);
-        let fn_item @ ItemFn { sig, .. } = &parse_macro_input!(item as ItemFn);
-        let fn_name = &sig.ident;
-
-        let harness_name = identifier_for_generated_function(fn_item, "auto_harness", hash);
-
-        let (decls, actual_arguments): (proc_macro2::TokenStream, Punctuated<Expr, Comma>) = sig
-            .inputs
-            .iter()
-            .enumerate()
-            .map(|(arg_num, a)| {
-                let ty = match a {
-                    FnArg::Receiver(r) => &r.ty,
-                    FnArg::Typed(pat) => &pat.ty,
-                };
-                let name = Ident::new(&format!("a_{arg_num}"), Span::mixed_site());
-                let decl = quote!(
-                    let #name : #ty = kani::any();
-                );
-                (decl, Expr::from(ExprPath { attrs: vec![], qself: None, path: name.into() }))
-            })
-            .unzip();
-        quote!(
-            #[kani::proof]
-            fn #harness_name() {
-                #decls
-                #fn_name(#actual_arguments);
-            }
-
-            #[kanitool::auto_harness = stringify!(#harness_name)]
-            #fn_item
-        )
-        .into()
-    }
-
     requires_ensures!(requires);
     requires_ensures!(ensures);
 
@@ -379,5 +377,4 @@ mod regular {
     no_op!(unwind);
     no_op!(requires);
     no_op!(ensures);
-    no_op!(auto_harness);
 }

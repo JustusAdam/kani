@@ -18,11 +18,11 @@ mod typ;
 pub use builtin::BuiltinFn;
 pub use expr::{
     arithmetic_overflow_result_type, ArithmeticOverflowResult, BinaryOperator, Expr, ExprValue,
-    Lambda, Quantifier, SelfOperator, UnaryOperator, ARITH_OVERFLOW_OVERFLOWED_FIELD,
+    MemoryTarget, Quantifier, SelfOperator, UnaryOperator, ARITH_OVERFLOW_OVERFLOWED_FIELD,
     ARITH_OVERFLOW_RESULT_FIELD,
 };
 pub use location::Location;
 pub use stmt::{Stmt, StmtBody, SwitchCase};
-pub use symbol::{Contract, Symbol, SymbolValues};
+pub use symbol::{Contract, Lambda, Symbol, SymbolValues};
 pub use symbol_table::SymbolTable;
 pub use typ::{CIntType, DatatypeComponent, Parameter, Type};
