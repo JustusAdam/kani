@@ -10,7 +10,7 @@ use cbmc::goto_program::{
 };
 use cbmc::InternString;
 use rustc_middle::mir::traversal::reverse_postorder;
-use rustc_middle::mir::{Body, HasLocalDecls, Local};
+use rustc_middle::mir::{Body, HasLocalDecls, Local, RETURN_PLACE};
 use rustc_middle::ty::{self, Instance};
 use std::collections::BTreeMap;
 use std::iter::FromIterator;
@@ -312,13 +312,18 @@ impl<'tcx> GotocCtx<'tcx> {
                     // TODO make this recursive with a visitor
                     assert!(stmts.iter().all(|s| !matches!(s.body(), StmtBody::Return(_))));
 
-                    let new_last_stmt = match ret_stmt.into_body() {
-                        StmtBody::Return(Some(expr)) => {
-                            Stmt::code_expression(expr.cast_to(Type::bool()), Location::none())
-                        }
-                        _ => unreachable!("Expected return statement with value"),
+                    let return_expr = match ret_stmt.into_body() {
+                        StmtBody::Return(return_expr_opt) => 
+                            return_expr_opt.unwrap_or_else(|| Expr::symbol_expression(self.codegen_var_name(&RETURN_PLACE), *return_type.clone())),
+                        s => {
+                            let instance_mir = self.tcx.instance_mir(instance.def);
+                            rustc_middle::mir::pretty::write_mir_fn(self.tcx, instance_mir, &mut |_, _| Ok(()), &mut std::io::stdout());
+                            unreachable!("Expected return statement, got {s:?}")
+                        },
                     };
-                    stmts.push(new_last_stmt);
+                    let new_last_statement = 
+                            Stmt::code_expression(return_expr.cast_to(Type::bool()), Location::none());
+                    stmts.push(new_last_statement);
                     stmts
                 }
                 _ => unreachable!("Expected block statement"),
