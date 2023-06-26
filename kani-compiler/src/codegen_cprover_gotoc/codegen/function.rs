@@ -247,6 +247,7 @@ impl<'tcx> GotocCtx<'tcx> {
     /// lambda takes the return value as first argument and then immediately
     /// calls the generated spec function, but passing the return value as the
     /// last argument.
+    #[cfg(not(feature = "inlined-goto-contracts"))]
     fn as_goto_contract(&mut self, fn_contract: &GFnContract<Instance<'tcx>>) -> Contract {
         use rustc_middle::mir;
         let mut handle_contract_expr = |instance| {
@@ -280,6 +281,78 @@ impl<'tcx> GotocCtx<'tcx> {
                 Some(return_var_name.into()),
                 func_expr.call(arguments).cast_to(Type::Bool),
             )
+        };
+
+        let requires =
+            fn_contract.requires().iter().copied().map(&mut handle_contract_expr).collect();
+        let ensures =
+            fn_contract.ensures().iter().copied().map(&mut handle_contract_expr).collect();
+        Contract::new(requires, ensures, vec![])
+    }
+
+    #[cfg(feature = "inlined-goto-contracts")]
+    fn as_goto_contract(&mut self, fn_contract: &GFnContract<Instance<'tcx>>) -> Contract {
+        use rustc_middle::mir::RETURN_PLACE;
+        use cbmc::goto_program::{Location, StmtBody, SymbolValues};
+
+        let mut handle_contract_expr = |instance| {
+            let instance_fn_name = self.symbol_name(instance);
+
+            let instance_sym = self.symbol_table.delete(instance_fn_name);
+
+            assert!(
+                instance_sym.is_function_definition(),
+                "Contract function must have been defined"
+            );
+
+            let typ = instance_sym.typ;
+
+            let (params, return_type) = match typ {
+                Type::Code { mut parameters, return_type } => {
+                    let result_ty =
+                        parameters.pop().expect("Function must have at least result type argument");
+                    parameters.insert(0, result_ty);
+                    (parameters, return_type)
+                }
+                _ => unreachable!("Expected function type, got {typ:?}"),
+            };
+
+            let mir = self.current_fn().mir();
+            assert!(!mir.spread_arg.is_some());
+
+            let stmt = match instance_sym.value {
+                SymbolValues::Stmt(stmt) => stmt,
+                _ => unreachable!(),
+            };
+
+            let stmts = match stmt.into_body() {
+                StmtBody::Block(mut stmts) => {
+                    let ret_stmt = stmts.pop().expect("Need at least return statment");
+
+                    // TODO make this recursive with a visitor
+                    assert!(stmts.iter().all(|s| !matches!(s.body(), StmtBody::Return(_))));
+
+                    let return_expr = match ret_stmt.into_body() {
+                        StmtBody::Return(return_expr_opt) => 
+                            return_expr_opt.unwrap_or_else(|| Expr::symbol_expression(self.codegen_var_name(&RETURN_PLACE), *return_type.clone())),
+                        s => {
+                            let instance_mir = self.tcx.instance_mir(instance.def);
+                            rustc_middle::mir::pretty::write_mir_fn(self.tcx, instance_mir, &mut |_, _| Ok(()), &mut std::io::stdout()).unwrap();
+                            unreachable!("Expected return statement, got {s:?}")
+                        },
+                    };
+                    let new_last_statement = 
+                        Stmt::code_expression(return_expr.cast_to(Type::bool()), Location::none());
+                    stmts.push(new_last_statement);
+                    stmts
+                }
+                _ => unreachable!("Expected block statement"),
+            };
+
+            Lambda {
+                arguments: params,
+                body: Expr::statement_expression(stmts, Type::bool()),
+            }
         };
 
         let requires =

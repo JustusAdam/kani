@@ -32,6 +32,7 @@ tracing-tree = "0.2.2"
 default = ['cprover']
 cprover = ['cbmc', 'num', 'serde']
 write_json_symtab = []
+inlined-goto-contracts = []
 
 [package.metadata.rust-analyzer]
 # This package uses rustc crates.

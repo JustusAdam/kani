@@ -170,8 +170,7 @@ pub enum ExprValue {
     },
     Quantify {
         quantifier: Quantifier,
-        typ: Type,
-        identifier: InternedString,
+        parameter: Parameter,
         body: Expr,
     },
     Old(Expr),
@@ -1682,6 +1681,13 @@ impl Expr {
         identifier: InternedString,
         body: Expr,
     ) -> Self {
-        expr!(ExprValue::Quantify { quantifier, typ, identifier, body }, Type::c_bool())
+        expr!(
+            ExprValue::Quantify {
+                quantifier,
+                parameter: Parameter::new(Some(identifier), None, typ),
+                body
+            },
+            Type::c_bool()
+        )
     }
 }

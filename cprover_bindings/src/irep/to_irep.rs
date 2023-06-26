@@ -353,19 +353,24 @@ impl ToIrep for ExprValue {
                 sub: elems.iter().map(|x| x.to_irep(mm)).collect(),
                 named_sub: linear_map![],
             },
-            ExprValue::Quantify { quantifier, typ, identifier, body } => Irep {
-                id: match quantifier {
-                    Quantifier::Forall => IrepId::Forall,
-                    Quantifier::Exists => IrepId::Exists,
-                },
-                sub: vec![
-                    Irep::tuple(vec![
-                        Irep::symbol(*identifier).with_named_sub(IrepId::Type, typ.to_irep(mm)),
-                    ]),
-                    body.to_irep(mm),
-                ],
-                named_sub: linear_map![(IrepId::Type, Type::Bool.to_irep(mm))],
-            },
+            ExprValue::Quantify { quantifier, parameter, body } => {
+                Irep {
+                    id: match quantifier {
+                        Quantifier::Forall => IrepId::Forall,
+                        Quantifier::Exists => IrepId::Exists,
+                    },
+                    sub: vec![
+                        Irep::tuple(vec![
+                            Irep::symbol(parameter.identifier().or(parameter.base_name()).expect(
+                                "Expected parameter to have either identifier or base name",
+                            ))
+                            .with_named_sub(IrepId::Type, parameter.typ().to_irep(mm)),
+                        ]),
+                        body.to_irep(mm),
+                    ],
+                    named_sub: linear_map![(IrepId::Type, Type::Bool.to_irep(mm))],
+                }
+            }
             ExprValue::Old(inner) => Irep {
                 id: IrepId::Old,
                 sub: vec![inner.to_irep(mm)],
