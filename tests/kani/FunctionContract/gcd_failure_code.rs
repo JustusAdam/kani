@@ -58,6 +58,9 @@ impl Frac {
 #[kani::proof]
 #[kani::unwind(12)]
 fn main() {
+    // Needed to avoid having `free` be removed as unused function. This is
+    // because DFCC contract enforcement assumes that a definition for `free`
+    // exists.
     let _ = Box::new(9_usize);
     let num: T = kani::any();
     let den: T = kani::any();
