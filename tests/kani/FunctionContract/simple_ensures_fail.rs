@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 // kani-verify-fail
 
-#[kani::ensures((result == x) | (result == y))]
+#[kani::ensures(result == x)]
 fn max(x: u32, y: u32) -> u32 {
     if x > y {
         x
@@ -13,5 +13,5 @@ fn max(x: u32, y: u32) -> u32 {
 
 #[kani::proof]
 fn main() {
-    max(7, 9);
+    max(7, 6);
 }

@@ -3,6 +3,7 @@
 // kani-verify-fail
 
 #[kani::ensures(kani::old(ptr) == *ptr - 1)]
+#[kani::requires(*ptr < 100)]
 fn modify(ptr: &mut u32) -> u32 {
     *ptr += 1;
     0
@@ -10,5 +11,6 @@ fn modify(ptr: &mut u32) -> u32 {
 
 #[kani::proof]
 fn main() {
-    modify(&mut 0);
+    let mut i = 0;
+    modify(&mut i);
 }
