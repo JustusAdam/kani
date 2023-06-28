@@ -5,7 +5,7 @@
 
 use crate::codegen_cprover_gotoc::GotocCtx;
 use crate::kani_middle::contracts::GFnContract;
-use cbmc::goto_program::{Contract, Expr, Lambda, Stmt, Symbol, Type};
+use cbmc::goto_program::{Expr, FunctionContract, Lambda, Stmt, Symbol, Type};
 use cbmc::InternString;
 use rustc_middle::mir::traversal::reverse_postorder;
 use rustc_middle::mir::{Body, HasLocalDecls, Local};
@@ -230,7 +230,7 @@ impl<'tcx> GotocCtx<'tcx> {
     ///
     /// ```rs
     /// as_goto_contract(..., GFnContract { requires: <contact_impl_fn>, .. })
-    ///     = Contract {
+    ///     = FunctionContract {
     ///         requires: [
     ///             Lambda {
     ///                 arguments: <return arg, args of f...>,
@@ -248,7 +248,7 @@ impl<'tcx> GotocCtx<'tcx> {
     /// calls the generated spec function, but passing the return value as the
     /// last argument.
     #[cfg(not(feature = "inlined-goto-contracts"))]
-    fn as_goto_contract(&mut self, fn_contract: &GFnContract<Instance<'tcx>>) -> Contract {
+    fn as_goto_contract(&mut self, fn_contract: &GFnContract<Instance<'tcx>>) -> FunctionContract {
         use rustc_middle::mir;
         let mut handle_contract_expr = |instance| {
             let goto_annotated_fn_name = self.current_fn().name();
@@ -287,7 +287,7 @@ impl<'tcx> GotocCtx<'tcx> {
             fn_contract.requires().iter().copied().map(&mut handle_contract_expr).collect();
         let ensures =
             fn_contract.ensures().iter().copied().map(&mut handle_contract_expr).collect();
-        Contract::new(requires, ensures, vec![])
+        FunctionContract::new(requires, ensures, vec![])
     }
 
     #[cfg(feature = "inlined-goto-contracts")]
@@ -359,7 +359,7 @@ impl<'tcx> GotocCtx<'tcx> {
             fn_contract.requires().iter().copied().map(&mut handle_contract_expr).collect();
         let ensures =
             fn_contract.ensures().iter().copied().map(&mut handle_contract_expr).collect();
-        Contract::new(requires, ensures, vec![])
+        FunctionContract::new(requires, ensures, vec![])
     }
 
     /// Convert the contract to a CBMC contract, then attach it to `instance`.

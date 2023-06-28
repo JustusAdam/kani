@@ -14,7 +14,7 @@ pub struct Symbol {
     pub typ: Type,
     pub value: SymbolValues,
     /// Contracts to be enforced (only supported for functions)
-    pub contract: Option<Box<Contract>>,
+    pub contract: Option<Box<FunctionContract>>,
 
     /// Optional debugging information
 
@@ -46,9 +46,16 @@ pub struct Symbol {
     pub is_weak: bool,
 }
 
-/// The equivalent of a "mathematical function" in CBMC but spiritually it is more like a function object.
+/// The equivalent of a "mathematical function" in CBMC. Semantically this is an
+/// anonymous function object, similar to a closure, but without closing over an
+/// environment.
 ///
-/// This is only used to implement function contracts and values of this sort are otherwise not constructible.
+/// This is only valid for use as a function contract. It may not perform side
+/// effects, a property that is enforced on the CBMC side.
+///
+/// The precise nomenclature is that in CBMC a contract value has *type*
+/// `mathematical_function` and values of that type are `lambda`s. Since this
+/// struct represents such values it is named `Lambda`.
 #[derive(Debug, Clone)]
 pub struct Lambda {
     pub arguments: Vec<Parameter>,
@@ -80,13 +87,13 @@ impl Lambda {
 /// See https://diffblue.github.io/cbmc/contracts-user.html for the meaning of
 /// each type of clause.
 #[derive(Clone, Debug)]
-pub struct Contract {
+pub struct FunctionContract {
     pub(crate) requires: Vec<Lambda>,
     pub(crate) ensures: Vec<Lambda>,
     pub(crate) assigns: Vec<Lambda>,
 }
 
-impl Contract {
+impl FunctionContract {
     pub fn new(requires: Vec<Lambda>, ensures: Vec<Lambda>, assigns: Vec<Lambda>) -> Self {
         Self { requires, ensures, assigns }
     }
@@ -158,7 +165,7 @@ impl Symbol {
 
     /// Add this contract to the symbol (symbol must be a function) or fold the
     /// conditions into an existing contract.
-    pub fn attach_contract(&mut self, contract: Contract) {
+    pub fn attach_contract(&mut self, contract: FunctionContract) {
         assert!(self.typ.is_code());
         match self.contract {
             Some(ref mut prior) => {
