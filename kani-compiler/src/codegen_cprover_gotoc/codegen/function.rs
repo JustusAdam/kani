@@ -381,9 +381,12 @@ impl<'tcx> GotocCtx<'tcx> {
         // difference is whether dfcc is used or not. With dfcc it's stored in
         // `contract::<fn name>`, otherwise directly on the type of the
         // function.
-        let use_dfcc = true;
+        // 
+        // Actually the issue sees to haver been something else and ataching to
+        // the symbol directly seems ot also work if dfcc is used.
+        let create_separate_contract_sym = true;
 
-        let contract_target_name = if use_dfcc {
+        let contract_target_name = if create_separate_contract_sym {
             let contract_sym_name = format!("contract::{}", name);
             self.ensure(&contract_sym_name, |ctx, fname| {
                 Symbol::function(
