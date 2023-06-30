@@ -391,7 +391,7 @@ impl<'tcx> GotocCtx<'tcx> {
         //
         // Actually the issue sees to haver been something else and ataching to
         // the symbol directly seems ot also work if dfcc is used.
-        let create_separate_contract_sym = true;
+        let create_separate_contract_sym = false;
 
         let contract_target_name = if create_separate_contract_sym {
             let contract_sym_name = format!("contract::{}", name);
@@ -400,7 +400,7 @@ impl<'tcx> GotocCtx<'tcx> {
                     fname,
                     ctx.fn_typ(),
                     None,
-                    ctx.current_fn().readable_name(),
+                    format!("contract::{}", ctx.current_fn().readable_name()),
                     ctx.codegen_span(&ctx.current_fn().mir().span),
                 )
                 .with_is_property(true)

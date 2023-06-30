@@ -550,6 +550,7 @@ fn reorder() {
 }
 
 #[kani::proof]
+#[kani::unwind(10)]
 #[kani::stub(core::fmt::Arguments::new_const, ArgumentsProxy::new_consts)]
 fn unsized_key_queries() {
     let mut map = VecMap::<String, u8>::new();
@@ -557,6 +558,16 @@ fn unsized_key_queries() {
     map.insert("bar".to_owned(), 2);
 
     assert_eq!(&map["bar"], &2);
+}
+
+#[kani::proof]
+#[kani::unwind(10)]
+fn int_key_queries() {
+    let mut map = VecMap::<u8, u8>::new();
+    let key = kani::any();
+    let val = kani::any();
+    map.insert(key, val);
+    assert_eq!(&map[&key], &val);
 }
 
 struct ArgumentProxy {

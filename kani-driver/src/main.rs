@@ -100,18 +100,6 @@ fn standalone_main() -> Result<()> {
 fn verify_project(project: Project, session: KaniSession) -> Result<()> {
     debug!(?project, "verify_project");
     let mut harnesses = session.determine_targets(&project.get_all_harnesses())?;
-    for (_, contract) in harnesses.iter_mut() {
-        if let Some(ctr) = contract.as_mut() {
-            *ctr = project
-                .metadata
-                .iter()
-                .flat_map(|kani_meta| kani_meta.function_contracts.iter())
-                .find(|names| names.pretty == *ctr)
-                .expect("Contract not found")
-                .mangled
-                .as_str();
-        }
-    }
     debug!(n = harnesses.len(), ?harnesses, "verify_project");
 
     // Verification

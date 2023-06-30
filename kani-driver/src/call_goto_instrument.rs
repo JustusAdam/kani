@@ -2,11 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 use anyhow::Result;
-use std::ffi::OsString;
 use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
 use std::process::Command;
+use std::{collections::HashMap, ffi::OsString};
 
 use crate::metadata::collect_and_link_function_pointer_restrictions;
 use crate::project::Project;
@@ -24,6 +24,13 @@ impl KaniSession {
         harness: &HarnessMetadata,
         contract: Option<&str>,
     ) -> Result<()> {
+        let pretty_name_map = {
+            let artifact =
+                project.get_harness_artifact(&harness, ArtifactType::PrettyNameMap).unwrap();
+            let reader = BufReader::new(File::open(artifact)?);
+            serde_json::from_reader(reader)?
+        };
+
         // We actually start by calling goto-cc to start the specialization:
         self.specialize_to_proof_harness(input, output, &harness.names.mangled)?;
 
@@ -39,7 +46,7 @@ impl KaniSession {
         }
 
         if let Some(function) = contract {
-            self.enforce_contract(harness, output, function)?;
+            self.enforce_contract(&pretty_name_map, harness, output, function)?;
         }
 
         if self.args.checks.undefined_function_on() {
@@ -62,9 +69,7 @@ impl KaniSession {
             }
 
             let c_demangled = alter_extension(output, "demangled.c");
-            let prett_name_map =
-                project.get_harness_artifact(&harness, ArtifactType::PrettyNameMap).unwrap();
-            self.demangle_c(prett_name_map, &c_outfile, &c_demangled)?;
+            self.demangle_c(&pretty_name_map, &c_outfile, &c_demangled)?;
             if !self.args.common_args.quiet {
                 println!("Demangled GotoC code written to {}", c_demangled.to_string_lossy())
             }
@@ -168,16 +173,22 @@ impl KaniSession {
     /// Make CBMC enforce a function contract.
     pub fn enforce_contract(
         &self,
+        pretty_name_map: &HashMap<String, Option<String>>,
         harness: &HarnessMetadata,
         file: &Path,
         function: &str,
     ) -> Result<()> {
-        println!("enforcing {function} contract");
+        let demangled = pretty_name_map
+            .iter()
+            .find(|(magled, pretty)| pretty.as_ref().map_or(false, |s| s == function))
+            .unwrap()
+            .0;
+        println!("enforcing function contract for {demangled}");
         self.call_goto_instrument(vec![
             "--dfcc".into(),
             (&harness.names.mangled).into(),
             "--enforce-contract".into(),
-            function.into(),
+            demangled.into(),
             file.into(),
             file.into(),
         ])
@@ -189,16 +200,13 @@ impl KaniSession {
     /// For local variables, it would be more complicated than a simple search and replace to obtain the demangled name.
     pub fn demangle_c(
         &self,
-        pretty_name_map_file: &impl AsRef<Path>,
+        pretty_name_map: &HashMap<String, Option<String>>,
         c_file: &Path,
         demangled_file: &Path,
     ) -> Result<()> {
         let mut c_code = std::fs::read_to_string(c_file)?;
-        let reader = BufReader::new(File::open(pretty_name_map_file)?);
-        let value: serde_json::Value = serde_json::from_reader(reader)?;
-        let pretty_name_map = value.as_object().unwrap();
-        for (name, pretty_name) in pretty_name_map {
-            if let Some(pretty_name) = pretty_name.as_str() {
+        for (name, pretty_name) in pretty_name_map.iter() {
+            if let Some(pretty_name) = pretty_name.as_ref() {
                 // Struct names start with "tag-", but this prefix is not used in the GotoC files, so we strip it.
                 // If there is no such prefix, we leave the name unchanged.
                 let name = name.strip_prefix("tag-").unwrap_or(name);
