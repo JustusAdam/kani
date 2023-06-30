@@ -4,9 +4,9 @@
 //! This file contains the code necessary to interface with the compiler backend
 
 use crate::codegen_cprover_gotoc::GotocCtx;
+use crate::kani_compiler::gather_contract_data;
 use crate::kani_middle::analysis;
 use crate::kani_middle::attributes::is_test_harness_description;
-use crate::kani_middle::contracts::GFnContract;
 use crate::kani_middle::metadata::gen_test_metadata;
 use crate::kani_middle::provide;
 use crate::kani_middle::reachability::{
@@ -70,8 +70,6 @@ pub struct GotocCodegenBackend {
     queries: Arc<Mutex<QueryDb>>,
 }
 
-type MonoContract<'tcx> = GFnContract<ty::Instance<'tcx>>;
-
 impl GotocCodegenBackend {
     pub fn new(queries: Arc<Mutex<QueryDb>>) -> Self {
         GotocCodegenBackend { queries }
@@ -84,7 +82,7 @@ impl GotocCodegenBackend {
         starting_items: &[MonoItem<'tcx>],
         symtab_goto: &Path,
         machine_model: &MachineModel,
-    ) -> (GotocCtx<'tcx>, Vec<(MonoItem<'tcx>, Option<MonoContract<'tcx>>)>) {
+    ) -> (GotocCtx<'tcx>, Vec<MonoItem<'tcx>>) {
         let items_with_contracts = with_timer(
             || collect_reachable_items(tcx, starting_items),
             "codegen reachability analysis",
@@ -197,7 +195,7 @@ impl GotocCodegenBackend {
             }
         }
 
-        (gcx, items_with_contracts)
+        (gcx, items)
     }
 }
 
@@ -256,9 +254,8 @@ impl CodegenBackend for GotocCodegenBackend {
                 for harness in harnesses {
                     let model_path =
                         queries.harness_model_path(&tcx.def_path_hash(harness.def_id())).unwrap();
-                    let (gcx, items_with_contracts) =
+                    let (gcx, items) =
                         self.codegen_items(tcx, &[harness], model_path, &results.machine_model);
-                    let items = items_with_contracts.into_iter().map(|(i, _contract)| i).collect();
                     results.extend(gcx, items, None);
                 }
             }
@@ -280,30 +277,14 @@ impl CodegenBackend for GotocCodegenBackend {
                 // We will be able to remove this once we optimize all calls to CBMC utilities.
                 // https://github.com/model-checking/kani/issues/1971
                 let model_path = base_filename.with_extension(ArtifactType::SymTabGoto);
-                let (gcx, items_with_contracts) =
+                let (gcx, items) =
                     self.codegen_items(tcx, &harnesses, &model_path, &results.machine_model);
-                let mut functions_with_contracts = vec![];
-                let items = items_with_contracts
-                    .into_iter()
-                    .map(|(i, contract)| {
-                        if contract.is_some() {
-                            let instance = match i {
-                                MonoItem::Fn(f) => f,
-                                _ => unreachable!(),
-                            };
-                            functions_with_contracts.push(gcx.symbol_name(instance))
-                        }
-                        i
-                    })
-                    .collect();
                 results.extend(gcx, items, None);
 
                 for (test_fn, test_desc) in harnesses.iter().zip(descriptions.iter()) {
                     let instance =
                         if let MonoItem::Fn(instance) = test_fn { instance } else { continue };
-                    let mut metadata =
-                        gen_test_metadata(tcx, *test_desc, *instance, &base_filename);
-                    metadata.contracts = functions_with_contracts.clone();
+                    let metadata = gen_test_metadata(tcx, *test_desc, *instance, &base_filename);
                     let test_model_path = &metadata.goto_file.as_ref().unwrap();
                     std::fs::copy(&model_path, &test_model_path).expect(&format!(
                         "Failed to copy {} to {}",
@@ -321,15 +302,8 @@ impl CodegenBackend for GotocCodegenBackend {
                         || entry_fn == Some(def_id)
                 });
                 let model_path = base_filename.with_extension(ArtifactType::SymTabGoto);
-                let (gcx, items_with_contracts) =
+                let (gcx, items) =
                     self.codegen_items(tcx, &local_reachable, &model_path, &results.machine_model);
-                let items = items_with_contracts
-                    .into_iter()
-                    .map(|(i, contract)| {
-                        assert!(contract.is_none());
-                        i
-                    })
-                    .collect();
                 results.extend(gcx, items, None);
             }
         }
@@ -346,7 +320,7 @@ impl CodegenBackend for GotocCodegenBackend {
                 write_file(
                     &base_filename,
                     ArtifactType::Metadata,
-                    &results.generate_metadata(),
+                    &results.generate_metadata(tcx),
                     queries.output_pretty_json,
                 );
             }
@@ -568,7 +542,7 @@ impl<'tcx> GotoCodegenResults<'tcx> {
         }
     }
     /// Method that generates `KaniMetadata` from the given compilation results.
-    pub fn generate_metadata(&self) -> KaniMetadata {
+    pub fn generate_metadata(&self, tcx: TyCtxt) -> KaniMetadata {
         // Maps the goto-context "unsupported features" data into the KaniMetadata "unsupported features" format.
         // TODO: Do we really need different formats??
         let unsupported_features = self
@@ -600,6 +574,8 @@ impl<'tcx> GotoCodegenResults<'tcx> {
             proof_harnesses: proofs,
             unsupported_features,
             test_harnesses: tests,
+            // I'm just being defensive here, this may not be needed
+            function_contracts: gather_contract_data(tcx),
         }
     }
 

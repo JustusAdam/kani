@@ -50,7 +50,7 @@ pub(crate) fn build(results: &[HarnessResult]) -> TableBuilder<FailureReasonsTab
             }
         };
 
-        let name = r.harness.pretty_name.trim_end_matches("::{closure#0}").to_string();
+        let name = r.harness.names.pretty.trim_end_matches("::{closure#0}").to_string();
         let identity =
             format!("{} @ {}:{}", name, r.harness.original_file, r.harness.original_start_line);
 

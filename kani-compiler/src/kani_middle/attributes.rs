@@ -106,9 +106,25 @@ pub(super) fn check_attributes(tcx: TyCtxt, def_id: DefId) {
     }
 }
 
+fn has_kani_attribute<F: Fn(KaniAttributeKind) -> bool>(
+    tcx: TyCtxt,
+    def_id: DefId,
+    predicate: F,
+) -> bool {
+    tcx.get_attrs_unchecked(def_id)
+        .iter()
+        .filter_map(|a| attr_kind(tcx, a))
+        .any(|attr| predicate(attr))
+}
+
 pub fn is_proof_harness(tcx: TyCtxt, def_id: DefId) -> bool {
-    let attributes = extract_kani_attributes(tcx, def_id);
-    attributes.contains_key(&KaniAttributeKind::Proof)
+    has_kani_attribute(tcx, def_id, |a| matches!(a, KaniAttributeKind::Proof))
+}
+
+pub fn is_contract(tcx: TyCtxt, def_id: DefId) -> bool {
+    has_kani_attribute(tcx, def_id, |a| {
+        matches!(a, KaniAttributeKind::Ensures | KaniAttributeKind::Requires)
+    })
 }
 
 /// Does this `def_id` have `#[rustc_test_marker]`?

@@ -16,22 +16,21 @@
 //! `-C llvm-args`.
 
 #[cfg(feature = "cprover")]
-use crate::codegen_cprover_gotoc::{symbol_name_for_instance, GotocCodegenBackend};
-use crate::kani_middle::attributes::is_proof_harness;
+use crate::codegen_cprover_gotoc::GotocCodegenBackend;
+use crate::kani_middle::attributes::{self, is_proof_harness};
 use crate::kani_middle::check_crate_items;
-use crate::kani_middle::metadata::gen_proof_metadata;
-use crate::kani_middle::reachability::{collect_reachable_items, filter_crate_items};
+use crate::kani_middle::metadata::{gen_proof_metadata, get_name_pair};
+use crate::kani_middle::reachability::filter_crate_items;
 use crate::kani_middle::stubbing::{self, harness_stub_map};
 use crate::kani_queries::{QueryDb, ReachabilityType};
 use crate::parser::{self, KaniCompilerParser};
 use crate::session::init_session;
-use kani_metadata::{ArtifactType, HarnessMetadata, KaniMetadata};
+use kani_metadata::{ArtifactType, HarnessMetadata, KaniMetadata, NamePair};
 use rustc_codegen_ssa::traits::CodegenBackend;
 use rustc_driver::{Callbacks, Compilation, RunCompiler};
 use rustc_hir::def_id::LOCAL_CRATE;
 use rustc_hir::definitions::DefPathHash;
 use rustc_interface::Config;
-use rustc_middle::mir::mono::MonoItem;
 use rustc_middle::ty::TyCtxt;
 use rustc_session::config::{ErrorOutputType, OutputType};
 use rustc_span::ErrorGuaranteed;
@@ -135,6 +134,13 @@ impl CompilationStage {
     }
 }
 
+pub fn gather_contract_data(tcx: TyCtxt) -> Vec<NamePair> {
+    filter_crate_items(tcx, |_, it| attributes::is_contract(tcx, it))
+        .into_iter()
+        .map(|it| get_name_pair(tcx, it.def_id()))
+        .collect()
+}
+
 /// This object controls the compiler behavior.
 ///
 /// It is responsible for initializing the query database, as well as controlling the compiler
@@ -228,13 +234,13 @@ impl KaniCompiler {
         if self.queries.lock().unwrap().reachability_analysis == ReachabilityType::Harnesses {
             let base_filename = tcx.output_filenames(()).output_path(OutputType::Object);
             let harnesses = filter_crate_items(tcx, |_, def_id| is_proof_harness(tcx, def_id));
+            let contracts = gather_contract_data(tcx);
             let all_harnesses = harnesses
                 .into_iter()
                 .map(|harness| {
                     let def_id = harness.def_id();
                     let def_path = tcx.def_path_hash(def_id);
-                    let contracts = contracts_for_harness(tcx, harness);
-                    let metadata = gen_proof_metadata(tcx, def_id, &base_filename, contracts);
+                    let metadata = gen_proof_metadata(tcx, def_id, &base_filename);
                     let stub_map = harness_stub_map(tcx, def_id, &metadata);
                     (def_path, HarnessInfo { metadata, stub_map })
                 })
@@ -252,7 +258,7 @@ impl KaniCompiler {
                     (all_harnesses.keys().cloned().collect(), vec![])
                 };
             // Store metadata file.
-            self.store_metadata(tcx, &all_harnesses);
+            self.store_metadata(tcx, &all_harnesses, contracts);
 
             // Even if no_stubs is empty we still need to store metadata.
             CompilationStage::CodegenNoStubs {
@@ -279,7 +285,7 @@ impl KaniCompiler {
                 debug!(
                     harnesses=?target_harnesses
                         .iter()
-                        .map(|h| &all_harnesses[h].metadata.pretty_name)
+                        .map(|h| &all_harnesses[h].metadata.names.pretty)
                         .collect::<Vec<_>>(),
                         "prepare_codegen"
                 );
@@ -297,7 +303,12 @@ impl KaniCompiler {
     }
 
     /// Write the metadata to a file
-    fn store_metadata(&self, tcx: TyCtxt, all_harnesses: &HashMap<HarnessId, HarnessInfo>) {
+    fn store_metadata(
+        &self,
+        tcx: TyCtxt,
+        all_harnesses: &HashMap<HarnessId, HarnessInfo>,
+        contracts: Vec<NamePair>,
+    ) {
         let (proof_harnesses, test_harnesses) = all_harnesses
             .values()
             .map(|info| &info.metadata)
@@ -308,6 +319,7 @@ impl KaniCompiler {
             proof_harnesses,
             unsupported_features: vec![],
             test_harnesses,
+            function_contracts: contracts,
         };
         let mut filename = tcx.output_filenames(()).output_path(OutputType::Object);
         filename.set_extension(ArtifactType::Metadata);
@@ -320,21 +332,6 @@ impl KaniCompiler {
             serde_json::to_writer(writer, &metadata).unwrap();
         }
     }
-}
-
-/// Find all functions reachable from this harness that have a contract attached to them.
-fn contracts_for_harness<'tcx>(tcx: TyCtxt<'tcx>, harness: MonoItem<'tcx>) -> Vec<String> {
-    collect_reachable_items(tcx, &[harness])
-        .into_iter()
-        .filter_map(|(i, contract)| {
-            let _ = contract?;
-            let instance = match i {
-                MonoItem::Fn(f) => f,
-                _ => unreachable!("Cannot add contracts to non-functions"),
-            };
-            Some(symbol_name_for_instance(tcx, instance))
-        })
-        .collect()
 }
 
 /// Group the harnesses by their stubs.
@@ -405,7 +402,7 @@ impl Callbacks for KaniCompiler {
 mod tests {
     use super::{HarnessInfo, Stubs};
     use crate::kani_compiler::{group_by_stubs, HarnessId};
-    use kani_metadata::{HarnessAttributes, HarnessMetadata};
+    use kani_metadata::{HarnessAttributes, HarnessMetadata, NamePair};
     use rustc_data_structures::fingerprint::Fingerprint;
     use rustc_hir::definitions::DefPathHash;
     use std::collections::HashMap;
@@ -419,15 +416,13 @@ mod tests {
 
     fn mock_metadata() -> HarnessMetadata {
         HarnessMetadata {
-            pretty_name: String::from("dummy"),
-            mangled_name: String::from("dummy"),
+            names: NamePair { pretty: String::from("dummy"), mangled: String::from("dummy") },
             crate_name: String::from("dummy"),
             original_file: String::from("dummy"),
             original_start_line: 10,
             original_end_line: 20,
             goto_file: None,
             attributes: HarnessAttributes::default(),
-            contracts: vec![],
         }
     }
 

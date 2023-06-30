@@ -36,7 +36,7 @@ impl<'sess, 'pr> HarnessRunner<'sess, 'pr> {
     /// the proof-checking process for each harness in `harnesses`.
     pub(crate) fn check_all_harnesses(
         &self,
-        harnesses: &'pr [&HarnessMetadata],
+        harnesses: &[(&'pr HarnessMetadata, Option<&str>)],
     ) -> Result<Vec<HarnessResult<'pr>>> {
         let sorted_harnesses = crate::metadata::sort_harnesses_by_loc(harnesses);
 
@@ -51,12 +51,18 @@ impl<'sess, 'pr> HarnessRunner<'sess, 'pr> {
         let results = pool.install(|| -> Result<Vec<HarnessResult<'pr>>> {
             sorted_harnesses
                 .par_iter()
-                .map(|harness| -> Result<HarnessResult<'pr>> {
-                    let harness_filename = harness.pretty_name.replace("::", "-");
+                .map(|(harness, contract)| -> Result<HarnessResult<'pr>> {
+                    let harness_filename = harness.names.pretty.replace("::", "-");
                     let report_dir = self.project.outdir.join(format!("report-{harness_filename}"));
                     let goto_file =
                         self.project.get_harness_artifact(&harness, ArtifactType::Goto).unwrap();
-                    self.sess.instrument_model(goto_file, goto_file, &self.project, &harness)?;
+                    self.sess.instrument_model(
+                        goto_file,
+                        goto_file,
+                        &self.project,
+                        &harness,
+                        *contract,
+                    )?;
 
                     if self.sess.args.synthesize_loop_contracts {
                         self.sess.synthesize_loop_contracts(goto_file, &goto_file, &harness)?;
@@ -81,7 +87,7 @@ impl KaniSession {
         harness: &HarnessMetadata,
     ) -> Result<VerificationResult> {
         if !self.args.common_args.quiet {
-            println!("Checking harness {}...", harness.pretty_name);
+            println!("Checking harness {}...", harness.names.pretty);
         }
 
         if self.args.visualize {
@@ -112,7 +118,7 @@ impl KaniSession {
                 .iter()
                 .filter_map(|result| {
                     (!result.harness.attributes.stubs.is_empty())
-                        .then_some(result.harness.pretty_name.as_str())
+                        .then_some(result.harness.names.pretty.as_str())
                 })
                 .collect();
             match ignored_stubs.len().cmp(&1) {
@@ -159,7 +165,7 @@ impl KaniSession {
                 println!("Summary:");
             }
             for failure in failures.iter() {
-                println!("Verification failed for - {}", failure.harness.pretty_name);
+                println!("Verification failed for - {}", failure.harness.names.pretty);
             }
 
             if total > 0 {

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 use crate::args::common::Verbosity;
-use crate::args::VerificationArgs;
+use crate::args::{ContractCheckArgs, VerificationArgs};
 use crate::util::render_command;
 use anyhow::{bail, Context, Result};
 use std::io::Write;
@@ -40,6 +40,8 @@ pub struct KaniSession {
 
     /// The temporary files we littered that need to be cleaned up at the end of execution
     pub temporaries: Mutex<Vec<PathBuf>>,
+
+    pub contract_args: Option<Box<ContractCheckArgs>>,
 }
 
 /// Represents where we detected Kani, with helper methods for using that information to find critical paths
@@ -64,6 +66,7 @@ impl KaniSession {
             kani_lib_c: install.kani_lib_c()?,
             kani_c_stubs: install.kani_c_stubs()?,
             temporaries: Mutex::new(vec![]),
+            contract_args: None,
         })
     }
 

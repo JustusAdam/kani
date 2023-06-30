@@ -27,6 +27,8 @@ pub struct KaniMetadata {
     pub unsupported_features: Vec<UnsupportedFeature>,
     /// If crates are built in test-mode, then test harnesses will be recorded here.
     pub test_harnesses: Vec<HarnessMetadata>,
+    /// Pretty name and mangled name for the function contracts we found.
+    pub function_contracts: Vec<NamePair>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

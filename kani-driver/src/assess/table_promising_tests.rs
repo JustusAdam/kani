@@ -36,7 +36,7 @@ pub(crate) fn build(results: &[HarnessResult]) -> TableBuilder<PromisingTestsTab
             // The functions assess runs are actually the closures inside the test harness macro expansion.
             // This means they have (pretty) names like `krate::module::a_test_name::{closure#0}`
             // Strip that closure suffix, so we have better names for showing humans:
-            let name = r.harness.pretty_name.trim_end_matches("::{closure#0}").to_string();
+            let name = r.harness.names.pretty.trim_end_matches("::{closure#0}").to_string();
             // Location in a format "clickable" in e.g. IDE terminals
             let location = format!("{}:{}", r.harness.original_file, r.harness.original_start_line);
 

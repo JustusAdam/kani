@@ -61,7 +61,7 @@ fn cargokani_main(input_args: Vec<OsString>) -> Result<()> {
     let input_args = join_args(input_args)?;
     let args = args::CargoKaniArgs::parse_from(input_args);
     check_is_valid(&args);
-    let session = session::KaniSession::new(args.verify_opts)?;
+    let mut session = session::KaniSession::new(args.verify_opts)?;
 
     match args.command {
         Some(CargoKaniSubcommand::Assess(args)) => {
@@ -70,8 +70,12 @@ fn cargokani_main(input_args: Vec<OsString>) -> Result<()> {
         Some(CargoKaniSubcommand::Playback(args)) => {
             return playback_cargo(*args);
         }
+        Some(CargoKaniSubcommand::CheckContract(args)) => {
+            session.args.exact = true;
+            session.contract_args = Some(args);
+        }
         None => {}
-    }
+    };
 
     if session.args.assess {
         return assess::run_assess(session, assess::AssessArgs::default());
@@ -86,11 +90,16 @@ fn standalone_main() -> Result<()> {
     let args = args::StandaloneArgs::parse();
     check_is_valid(&args);
 
-    if let Some(StandaloneSubcommand::Playback(args)) = args.command {
-        return playback_standalone(*args);
+    let mut session = session::KaniSession::new(args.verify_opts)?;
+    match args.command {
+        Some(StandaloneSubcommand::Playback(args)) => return playback_standalone(*args),
+        Some(StandaloneSubcommand::CheckContract(args)) => {
+            session.args.exact = true;
+            session.contract_args = Some(args);
+        }
+        None => {}
     }
 
-    let session = session::KaniSession::new(args.verify_opts)?;
     let project = project::standalone_project(&args.input.unwrap(), &session)?;
     if session.args.only_codegen { Ok(()) } else { verify_project(project, session) }
 }
@@ -98,7 +107,19 @@ fn standalone_main() -> Result<()> {
 /// Run verification on the given project.
 fn verify_project(project: Project, session: KaniSession) -> Result<()> {
     debug!(?project, "verify_project");
-    let harnesses = session.determine_targets(&project.get_all_harnesses())?;
+    let mut harnesses = session.determine_targets(&project.get_all_harnesses())?;
+    for (_, contract) in harnesses.iter_mut() {
+        if let Some(ctr) = contract.as_mut() {
+            *ctr = project
+                .metadata
+                .iter()
+                .flat_map(|kani_meta| kani_meta.function_contracts.iter())
+                .find(|names| names.pretty == *ctr)
+                .expect("Contract not found")
+                .mangled
+                .as_str();
+        }
+    }
     debug!(n = harnesses.len(), ?harnesses, "verify_project");
 
     // Verification

@@ -24,7 +24,9 @@ use strum::VariantNames;
 /// Trait used to perform extra validation after parsing.
 pub trait ValidateArgs {
     /// Perform post-parsing validation but do not abort.
-    fn validate(&self) -> Result<(), Error>;
+    fn validate(&self) -> Result<(), Error> {
+        Ok(())
+    }
 }
 
 /// Validate a set of arguments and ensure they are in a valid state.
@@ -87,6 +89,8 @@ pub struct StandaloneArgs {
 pub enum StandaloneSubcommand {
     /// Execute concrete playback testcases of a local crate.
     Playback(Box<playback_args::KaniPlaybackArgs>),
+
+    CheckContract(Box<ContractCheckArgs>),
 }
 
 #[derive(Debug, clap::Parser)]
@@ -112,6 +116,8 @@ pub enum CargoKaniSubcommand {
 
     /// Execute concrete playback testcases of a local package.
     Playback(Box<playback_args::CargoPlaybackArgs>),
+
+    CheckContract(Box<ContractCheckArgs>),
 }
 
 // Common arguments for invoking Kani for verification purpose. This gets put into KaniContext,
@@ -500,6 +506,7 @@ impl ValidateArgs for CargoKaniSubcommand {
             // Assess doesn't implement validation yet.
             CargoKaniSubcommand::Assess(_) => Ok(()),
             CargoKaniSubcommand::Playback(playback) => playback.validate(),
+            CargoKaniSubcommand::CheckContract(check) => check.validate(),
         }
     }
 }
@@ -698,6 +705,82 @@ where
         Self(values.into_iter().map(|t| t.into()).collect())
     }
 }
+
+#[derive(Debug, Clone)]
+pub struct StrItemPath(Vec<String>);
+
+impl<S: Into<String>> std::iter::FromIterator<S> for StrItemPath {
+    fn from_iter<T: IntoIterator<Item = S>>(iter: T) -> Self {
+        Self(iter.into_iter().map(Into::into).collect())
+    }
+}
+
+impl std::str::FromStr for StrItemPath {
+    type Err = String;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        s.split("::")
+            .map(|segment| {
+                if let Some(char) = segment.chars().find(|c| !c.is_alphanumeric()) {
+                    Err(format!("Illegal character '{char}' in path segment '{segment}'"))
+                } else {
+                    Ok(segment)
+                }
+            })
+            .collect()
+    }
+}
+
+impl std::string::ToString for StrItemPath {
+    fn to_string(&self) -> String {
+        self.0.as_slice().join("::")
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct ContractCheckSpec {
+    pub contract: String,
+    pub harness: Option<String>,
+}
+
+impl ContractCheckSpec {
+    pub fn new_with_default_harness(contract: String) -> Self {
+        Self { contract, harness: None }
+    }
+
+    pub fn new_with_explicit_harness(contract: String, harness: String) -> Self {
+        Self { contract, harness: Some(harness) }
+    }
+}
+
+impl std::str::FromStr for ContractCheckSpec {
+    type Err = String;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let mut split = s.split("/");
+        macro_rules! mk_err {
+            ($msg:literal) => { mk_err!($msg,) };
+            ($msg:literal, $($args:expr),*) => {
+                format!(concat!("Expected format 'contract/harness' or 'contract' but found ", $msg), $($args),*)
+            };
+        }
+        let contract = split.next().ok_or_else(|| mk_err!("emptiness"))?.to_string();
+        let harness = split.next();
+        let leftover = split.count();
+        if leftover != 0 {
+            Err(mk_err!(" too many '/' characters {}", leftover + 2))
+        } else if let Some(harness) = harness {
+            Ok(ContractCheckSpec::new_with_explicit_harness(contract, harness.to_string()))
+        } else {
+            Ok(ContractCheckSpec::new_with_default_harness(contract))
+        }
+    }
+}
+
+#[derive(clap::Args, Clone, Debug)]
+pub struct ContractCheckArgs {
+    pub to_check: Vec<ContractCheckSpec>,
+}
+
+impl ValidateArgs for ContractCheckArgs {}
 
 #[cfg(test)]
 mod tests {

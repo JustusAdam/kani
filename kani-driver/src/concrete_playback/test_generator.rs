@@ -38,7 +38,7 @@ impl KaniSession {
                 println!(
                     "WARNING: Kani could not produce a concrete playback for `{}` because there \
                     were no failing panic checks or satisfiable cover statements.",
-                    harness.pretty_name
+                    harness.names.pretty
                 )
             } else {
                 let mut unit_tests: Vec<UnitTest> = harness_values
@@ -54,7 +54,7 @@ impl KaniSession {
                         for generated_unit_test in unit_tests.iter() {
                             println!(
                                 "Concrete playback unit test for `{}`:\n```\n{}\n```",
-                                &harness.pretty_name,
+                                &harness.names.pretty,
                                 &generated_unit_test.code.join("\n")
                             );
                         }

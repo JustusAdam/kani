@@ -5,13 +5,18 @@ use crate::CbmcSolver;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NamePair {
+    /// The fully qualified name the user gave to the function (i.e. includes the module path).
+    pub pretty: String,
+    /// The name of the function in the CBMC symbol table.
+    pub mangled: String,
+}
+
 /// We emit this structure for each annotated proof harness (`#[kani::proof]`) we find.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HarnessMetadata {
-    /// The fully qualified name the user gave to the function (i.e. includes the module path).
-    pub pretty_name: String,
-    /// The name of the function in the CBMC symbol table.
-    pub mangled_name: String,
+    pub names: NamePair,
     /// The name of the crate this harness belongs to.
     pub crate_name: String,
     /// The (currently full-) path to the file this proof harness was declared within.
@@ -24,8 +29,6 @@ pub struct HarnessMetadata {
     pub goto_file: Option<PathBuf>,
     /// The `#[kani::<>]` attributes added to a harness.
     pub attributes: HarnessAttributes,
-
-    pub contracts: Vec<String>,
 }
 
 /// The attributes added by the user to control how a harness is executed.
@@ -55,11 +58,11 @@ impl HarnessMetadata {
     /// harness name contains ::, then we use rightmost name..
     pub fn get_harness_name_unqualified(&self) -> &str {
         const PATH_SEPARATOR: &str = "::";
-        if let Some(last_separator) = self.pretty_name.rfind(PATH_SEPARATOR) {
+        if let Some(last_separator) = self.names.pretty.rfind(PATH_SEPARATOR) {
             let name_start = last_separator + PATH_SEPARATOR.len();
-            &self.pretty_name[name_start..]
+            &self.names.pretty[name_start..]
         } else {
-            &self.pretty_name
+            &self.names.pretty
         }
     }
 }

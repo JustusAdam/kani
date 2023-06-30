@@ -292,8 +292,8 @@ impl<'tcx> GotocCtx<'tcx> {
 
     #[cfg(feature = "inlined-goto-contracts")]
     fn as_goto_contract(&mut self, fn_contract: &GFnContract<Instance<'tcx>>) -> Contract {
-        use rustc_middle::mir::RETURN_PLACE;
         use cbmc::goto_program::{Location, StmtBody, SymbolValues};
+        use rustc_middle::mir::RETURN_PLACE;
 
         let mut handle_contract_expr = |instance| {
             let instance_fn_name = self.symbol_name(instance);
@@ -333,15 +333,25 @@ impl<'tcx> GotocCtx<'tcx> {
                     assert!(stmts.iter().all(|s| !matches!(s.body(), StmtBody::Return(_))));
 
                     let return_expr = match ret_stmt.into_body() {
-                        StmtBody::Return(return_expr_opt) => 
-                            return_expr_opt.unwrap_or_else(|| Expr::symbol_expression(self.codegen_var_name(&RETURN_PLACE), *return_type.clone())),
+                        StmtBody::Return(return_expr_opt) => return_expr_opt.unwrap_or_else(|| {
+                            Expr::symbol_expression(
+                                self.codegen_var_name(&RETURN_PLACE),
+                                *return_type.clone(),
+                            )
+                        }),
                         s => {
                             let instance_mir = self.tcx.instance_mir(instance.def);
-                            rustc_middle::mir::pretty::write_mir_fn(self.tcx, instance_mir, &mut |_, _| Ok(()), &mut std::io::stdout()).unwrap();
+                            rustc_middle::mir::pretty::write_mir_fn(
+                                self.tcx,
+                                instance_mir,
+                                &mut |_, _| Ok(()),
+                                &mut std::io::stdout(),
+                            )
+                            .unwrap();
                             unreachable!("Expected return statement, got {s:?}")
-                        },
+                        }
                     };
-                    let new_last_statement = 
+                    let new_last_statement =
                         Stmt::code_expression(return_expr.cast_to(Type::bool()), Location::none());
                     stmts.push(new_last_statement);
                     stmts
@@ -349,10 +359,7 @@ impl<'tcx> GotocCtx<'tcx> {
                 _ => unreachable!("Expected block statement"),
             };
 
-            Lambda {
-                arguments: params,
-                body: Expr::statement_expression(stmts, Type::bool()),
-            }
+            Lambda { arguments: params, body: Expr::statement_expression(stmts, Type::bool()) }
         };
 
         let requires =
@@ -381,7 +388,7 @@ impl<'tcx> GotocCtx<'tcx> {
         // difference is whether dfcc is used or not. With dfcc it's stored in
         // `contract::<fn name>`, otherwise directly on the type of the
         // function.
-        // 
+        //
         // Actually the issue sees to haver been something else and ataching to
         // the symbol directly seems ot also work if dfcc is used.
         let create_separate_contract_sym = true;
