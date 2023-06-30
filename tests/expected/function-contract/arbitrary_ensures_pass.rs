@@ -8,5 +8,12 @@ fn max(x: u32, y: u32) -> u32 {
 
 #[kani::proof]
 fn main() {
+    let _ = Box::new(());
     max(kani::any(), kani::any());
+}
+
+
+#[kani::proof]
+fn main2() {
+    panic!()
 }

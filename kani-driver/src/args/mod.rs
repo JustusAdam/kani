@@ -89,8 +89,6 @@ pub struct StandaloneArgs {
 pub enum StandaloneSubcommand {
     /// Execute concrete playback testcases of a local crate.
     Playback(Box<playback_args::KaniPlaybackArgs>),
-
-    CheckContract(Box<ContractCheckArgs>),
 }
 
 #[derive(Debug, clap::Parser)]
@@ -116,8 +114,6 @@ pub enum CargoKaniSubcommand {
 
     /// Execute concrete playback testcases of a local package.
     Playback(Box<playback_args::CargoPlaybackArgs>),
-
-    CheckContract(Box<ContractCheckArgs>),
 }
 
 // Common arguments for invoking Kani for verification purpose. This gets put into KaniContext,
@@ -186,7 +182,7 @@ pub struct VerificationArgs {
 
     /// When specified, the harness filter will only match the exact fully qualified name of a harness
     #[arg(long, requires("harnesses"))]
-    pub exact: bool,
+    exact: bool,
 
     /// Link external C files referenced by Rust code.
     /// This is an experimental feature and requires `-Z c-ffi` to be used
@@ -316,6 +312,9 @@ pub struct VerificationArgs {
 
     #[command(flatten)]
     pub common_args: CommonArgs,
+
+    #[command(flatten)]
+    pub contract_check_args: ContractCheckArgs,
 }
 
 impl VerificationArgs {
@@ -345,6 +344,10 @@ impl VerificationArgs {
             Some(None) => None,       // -j
             Some(Some(x)) => Some(x), // -j=x
         }
+    }
+
+    pub fn exact(&self) -> bool {
+        self.exact || self.contract_check_args.check_contract.is_some()
     }
 }
 
@@ -506,7 +509,6 @@ impl ValidateArgs for CargoKaniSubcommand {
             // Assess doesn't implement validation yet.
             CargoKaniSubcommand::Assess(_) => Ok(()),
             CargoKaniSubcommand::Playback(playback) => playback.validate(),
-            CargoKaniSubcommand::CheckContract(check) => check.validate(),
         }
     }
 }
@@ -777,7 +779,8 @@ impl std::str::FromStr for ContractCheckSpec {
 
 #[derive(clap::Args, Clone, Debug)]
 pub struct ContractCheckArgs {
-    pub to_check: Vec<ContractCheckSpec>,
+    #[arg(long)]
+    pub check_contract: Option<Vec<ContractCheckSpec>>,
 }
 
 impl ValidateArgs for ContractCheckArgs {}

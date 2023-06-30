@@ -70,10 +70,6 @@ fn cargokani_main(input_args: Vec<OsString>) -> Result<()> {
         Some(CargoKaniSubcommand::Playback(args)) => {
             return playback_cargo(*args);
         }
-        Some(CargoKaniSubcommand::CheckContract(args)) => {
-            session.args.exact = true;
-            session.contract_args = Some(args);
-        }
         None => {}
     };
 
@@ -93,10 +89,6 @@ fn standalone_main() -> Result<()> {
     let mut session = session::KaniSession::new(args.verify_opts)?;
     match args.command {
         Some(StandaloneSubcommand::Playback(args)) => return playback_standalone(*args),
-        Some(StandaloneSubcommand::CheckContract(args)) => {
-            session.args.exact = true;
-            session.contract_args = Some(args);
-        }
         None => {}
     }
 

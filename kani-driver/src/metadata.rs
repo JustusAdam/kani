@@ -118,23 +118,24 @@ impl KaniSession {
         &self,
         all_harnesses: &[&'a HarnessMetadata],
     ) -> Result<Vec<(&'a HarnessMetadata, Option<&str>)>> {
-        let harnesses = if let Some(contract_spec) = self.contract_args.as_ref() {
-            assert!(self.args.function.is_none());
-            assert!(self.args.harnesses.is_empty());
-            // TODO make this use paths
-            BTreeMap::from_iter(contract_spec.to_check.iter().map(|spec| {
-                (
-                    spec.harness
-                        .as_ref()
-                        .expect("harnesses are required at the moment for contract checking"),
-                    Some(spec.contract.as_str()),
-                )
-            }))
-        } else if self.args.harnesses.is_empty() {
-            self.args.function.iter().zip(repeat(None)).collect()
-        } else {
-            self.args.harnesses.iter().zip(repeat(None)).collect()
-        };
+        let harnesses =
+            if let Some(contract_spec) = self.args.contract_check_args.check_contract.as_ref() {
+                assert!(self.args.function.is_none());
+                assert!(self.args.harnesses.is_empty());
+                // TODO make this use paths
+                BTreeMap::from_iter(contract_spec.iter().map(|spec| {
+                    (
+                        spec.harness
+                            .as_ref()
+                            .expect("harnesses are required at the moment for contract checking"),
+                        Some(spec.contract.as_str()),
+                    )
+                }))
+            } else if self.args.harnesses.is_empty() {
+                self.args.function.iter().zip(repeat(None)).collect()
+            } else {
+                self.args.harnesses.iter().zip(repeat(None)).collect()
+            };
 
         let total_harnesses = harnesses.len();
         let all_targets = &harnesses;
@@ -142,17 +143,17 @@ impl KaniSession {
         if harnesses.is_empty() {
             Ok(Vec::from_iter(all_harnesses.iter().cloned().zip(repeat(None))))
         } else {
-            let harnesses_found = find_proof_harnesses(&harnesses, all_harnesses, self.args.exact);
-
+            let harnesses_found =
+                find_proof_harnesses(&harnesses, all_harnesses, self.args.exact());
             // If even one harness was not found with --exact, return an error to user
-            if self.args.exact && harnesses_found.len() < total_harnesses {
+            if self.args.exact() && harnesses_found.len() < total_harnesses {
                 let harness_found_names: BTreeSet<&String> =
                     harnesses_found.iter().map(|&h| &h.0.names.pretty).collect();
 
                 // Check which harnesses are missing from the difference of targets and harnesses_found
                 let harnesses_missing: Vec<&String> = all_targets
                     .keys()
-                    .filter(|k| harness_found_names.contains(**k))
+                    .filter(|k| !harness_found_names.contains(**k))
                     .cloned()
                     .collect();
                 let joined_string = harnesses_missing

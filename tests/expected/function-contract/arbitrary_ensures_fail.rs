@@ -9,5 +9,6 @@ fn max(x: u32, y: u32) -> u32 {
 
 #[kani::proof]
 fn main() {
+    let _ = Box::new(9_usize);
     max(kani::any(), kani::any());
 }
