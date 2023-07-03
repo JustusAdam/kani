@@ -180,8 +180,8 @@ impl KaniSession {
     ) -> Result<()> {
         let demangled = pretty_name_map
             .iter()
-            .find(|(magled, pretty)| pretty.as_ref().map_or(false, |s| s == function))
-            .unwrap()
+            .find(|(_, pretty)| pretty.as_ref().map_or(false, |s| s == function))
+            .unwrap_or_else(|| panic!("Could not find function '{function}' in name map"))
             .0;
         println!("enforcing function contract for {demangled}");
         self.call_goto_instrument(vec![

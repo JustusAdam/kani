@@ -270,15 +270,29 @@ impl<'tcx> GotocCtx<'tcx> {
                 mir_arguments.iter().map(|l| mir::Operand::Copy((*l).into())).collect();
             let mut arguments = self.codegen_funcall_args(&mir_operands, true);
 
-            mir_arguments.insert(0, return_arg);
-            let return_var_name = self.codegen_var_name(&return_arg);
-            arguments.push(Expr::symbol_expression(
-                &return_var_name,
-                goto_annotated_fn_typ.return_type().expect("No return type found").clone(),
-            ));
+            let return_var_name = {
+                let return_var_name = self.codegen_var_name(&return_arg);
+                arguments.push(
+                    Expr::symbol_expression(
+                        &return_var_name,
+                        goto_annotated_fn_typ.return_type().expect("No return type found").clone(),
+                    )
+                    .address_of(),
+                );
+                Some(return_var_name.into())
+            };
+
+            // let return_var_name = (!self.is_zst(self.local_ty(mir::RETURN_PLACE))).then(|| {
+            //     let return_var_name = self.codegen_var_name(&return_arg);
+            //     arguments.push(Expr::symbol_expression(
+            //         &return_var_name,
+            //         goto_annotated_fn_typ.return_type().expect("No return type found").clone(),
+            //     ));
+            //     return_var_name.into()
+            // });
             Lambda::as_contract_for(
                 &goto_annotated_fn_typ,
-                Some(return_var_name.into()),
+                return_var_name,
                 func_expr.call(arguments).cast_to(Type::Bool),
             )
         };

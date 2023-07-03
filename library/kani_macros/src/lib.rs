@@ -128,6 +128,7 @@ mod sysroot {
     };
 
     use proc_macro2::Ident;
+    use syn::{spanned::Spanned, TypeReference};
 
     /// Create a unique hash for a token stream (basically a [`std::hash::Hash`]
     /// impl for `proc_macro2::TokenStream`).
@@ -296,7 +297,12 @@ mod sysroot {
                 subpat: None,
             })),
             colon_token: Token![:](Span::call_site()),
-            ty: typ,
+            ty: Box::new(Type::Reference(TypeReference {
+                and_token: Token!(&)(item_fn.span()),
+                elem: typ,
+                mutability: None,
+                lifetime: None,
+            })),
         }));
 
         assert!(sig.variadic.is_none(), "Variadic signatures are not supported");
@@ -308,6 +314,7 @@ mod sysroot {
         gen_sig.ident = gen_fn_name;
 
         quote!(
+            #[allow(unused_variables)]
             #gen_sig {
                 #attr
             }
