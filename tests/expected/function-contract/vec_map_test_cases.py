@@ -67,14 +67,33 @@ def check_and_report_cmd_result(result, fail=True):
             return False
     return True
 
-def main():
+def list_available():
+    col_0_width = 1
+    col_1_width = 20
+    col_2_width = 20
+    for i, tc in enumerate(TEST_CASES):
+        col_0_width = max(col_0_width, len(str(i)))
+        col_1_width = max(col_1_width, len(tc.function))
+        col_2_width = max(col_2_width, len(tc.harness))
+    def row(col1, col2, col3):
+        print(f" {col1:^{ col_0_width}} | {col2:^{ col_1_width}} | {col3:^{ col_2_width}}")
+    row('#', 'Function', 'Harness')
+    print(f"-{'' :-^{col_0_width}}-+-{''        :-^{col_1_width}}-+-{''       :-^{col_2_width}}")
+    for i, tc in enumerate(TEST_CASES):
+        row(i, tc.function, tc.harness)
 
+def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--fail-fast", action="store_true", help="Abort after the first failed verification or timeout")
     parser.add_argument("--index", type=int, help="Run test with this number")
     parser.add_argument("--timeout", type=float, help="Abandon verification after this many seconds")
     parser.add_argument("--filter", help="Only run contracts which match this pattern")
+    parser.add_argument("--list", action='store_true')
     args = parser.parse_args()
+
+    if args.list:
+        list_available()
+        return
 
     print("Building kani ... ", end='', flush=True)
 
