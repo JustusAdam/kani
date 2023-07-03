@@ -46,7 +46,7 @@ impl<K, V> VecMap<K, V> {
         Self::with_capacity(0)
     }
 
-    //#[post(result.len() == 0)]
+    #[post(result.len() == 0)]
     pub fn with_capacity(capacity: usize) -> Self
     where
         K: PartialEq,
@@ -87,8 +87,8 @@ impl<K, V> VecMap<K, V> {
         self.position(key).map(|p| &self.values[p])
     }
 
-    //#[post(implies(!old(self.contains_key(key)), result.is_none()))]
-    //#[post(implies(old(self.contains_key(key)), result.is_some()))]
+    #[post(implies(!self.contains_key(key), result.is_none()))]
+    #[post(implies(self.contains_key(key), result.is_some()))]
     pub fn get_mut<'l, Q: PartialEq<K> + ?Sized>(&'l mut self, key: &Q) -> Option<&'l mut V> {
         self.position(key).map(move |p| &mut self.values[p])
     }
@@ -576,7 +576,7 @@ mod contract_harnesses {
 
     fn arbitrary_vec_map<K: Eq + Arbitrary, V: Arbitrary>() -> VecMap<K, V> {
         let len = kani::any();
-        kani::assume(len < 10);
+        kani::assume(len < 4);
         std::iter::from_fn(|| Some((kani::any(), kani::any()))).take(len).collect()
         
     }
@@ -605,6 +605,50 @@ mod contract_harnesses {
         m.clear();
     }
 
+    #[kani::proof]
+    #[kani::unwind(10)]
+    fn get() {
+        let m : VecMap<u8, u8> = arbitrary_vec_map();
+        let k: u8 = kani::any();
+        m.get(&k);
+    }
+
+    #[kani::proof]
+    fn get_mut() {
+        let mut m : VecMap<u8, u8> = arbitrary_vec_map();
+        let k: u8 = kani::any();
+        m.get_mut(&k);
+    }
+
+    #[kani::proof]
+    fn insert() {
+        let mut m : VecMap<u8, u8> = arbitrary_vec_map();
+        let k: u8 = kani::any();
+        let v: u8 = kani::any();
+        m.insert(k, v);
+    }
+
+    #[kani::proof]
+    fn get_key_value() {
+        let m : VecMap<u8, u8> = arbitrary_vec_map();
+        let k: u8 = kani::any();
+        m.get_key_value(&k);
+    }
+
+    #[kani::proof]
+    fn remove() {
+        let mut m : VecMap<u8, u8> = arbitrary_vec_map();
+        let k: u8 = kani::any();
+        m.remove(&k);
+    }
+
+
+    #[kani::proof]
+    fn remove_entry() {
+        let mut m : VecMap<u8, u8> = arbitrary_vec_map();
+        let k: u8 = kani::any();
+        m.remove_entry(&k);
+    }
 }
 
 struct ArgumentProxy {

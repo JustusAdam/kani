@@ -181,7 +181,7 @@ impl KaniSession {
         let demangled = pretty_name_map
             .iter()
             .find(|(_, pretty)| pretty.as_ref().map_or(false, |s| s == function))
-            .unwrap_or_else(|| panic!("Could not find function '{function}' in name map"))
+            .unwrap_or_else(|| panic!("Could not find function '{function}' in name map, it likely is not in the reachable code. Ensure that your harness calls the fucntion for which you would like to check the contract (including the correct type variable instantiations)."))
             .0;
         println!("enforcing function contract for {demangled}");
         self.call_goto_instrument(vec![
