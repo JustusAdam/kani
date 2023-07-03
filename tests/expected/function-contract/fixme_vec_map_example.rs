@@ -46,7 +46,7 @@ impl<K, V> VecMap<K, V> {
         Self::with_capacity(0)
     }
 
-    #[post(result.len() == 0)]
+    //#[post(result.len() == 0)]
     pub fn with_capacity(capacity: usize) -> Self
     where
         K: PartialEq,
@@ -66,7 +66,7 @@ impl<K, V> VecMap<K, V> {
         self.keys.capacity().min(self.values.capacity())
     }
 
-    // #[post(self.len() == 0)]
+    #[post(self.len() == 0)]
     pub fn clear(&mut self) {
         self.keys.clear();
         self.values.clear();
@@ -568,6 +568,43 @@ fn int_key_queries() {
     let val = kani::any();
     map.insert(key, val);
     assert_eq!(&map[&key], &val);
+}
+
+mod contract_harnesses {
+    use super::*;
+    use kani::Arbitrary;
+
+    fn arbitrary_vec_map<K: Eq + Arbitrary, V: Arbitrary>() -> VecMap<K, V> {
+        let len = kani::any();
+        kani::assume(len < 10);
+        std::iter::from_fn(|| Some((kani::any(), kani::any()))).take(len).collect()
+        
+    }
+
+    #[kani::proof]
+    fn new_1() {
+        let _ = VecMap::<u8, u8>::new();
+    }
+
+
+    #[kani::proof]
+    fn new_2() {
+        let _ = VecMap::<u64, Option<i32>>::new();
+    }
+
+    #[kani::proof]
+    fn with_capacity() {
+        let len = kani::any();
+        let _ = VecMap::<u8, u8>::with_capacity(len);
+    }
+
+    #[kani::proof]
+    #[kani::unwind(20)]
+    fn clear() {
+        let mut m : VecMap<u8, u8> = arbitrary_vec_map();
+        m.clear();
+    }
+
 }
 
 struct ArgumentProxy {
