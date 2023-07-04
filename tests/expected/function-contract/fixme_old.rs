@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 // kani-verify-fail
 
-#[kani::ensures(kani::old(ptr) == *ptr - 1)]
+#[kani::ensures(*old_ptr == *ptr - 1)]
 #[kani::requires(*ptr < 100)]
 fn modify(ptr: &mut u32) -> u32 {
     *ptr += 1;
@@ -11,6 +11,7 @@ fn modify(ptr: &mut u32) -> u32 {
 
 #[kani::proof]
 fn main() {
-    let mut i = 0;
+    let _ = Box::new(());
+    let mut i = kani::any();
     modify(&mut i);
 }

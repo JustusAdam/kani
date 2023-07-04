@@ -1,10 +1,11 @@
 // Copyright Kani Contributors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
+// kani-flags: --check-contract gcd/main
 type T = u8;
 
 /// Euclid's algorithm for calculating the GCD of two numbers
 #[kani::requires(x != 0 && y != 0)]
-#[kani::ensures(result != 0 && x % result == 0 && y % result == 0)]
+#[kani::ensures(*result != 0 && x % *result == 0 && y % *result == 0)]
 fn gcd(x: T, y: T) -> T {
     let mut max = x;
     let mut min = y;

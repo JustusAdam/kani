@@ -1,0 +1,3 @@
+Check 92: gcd_failure_contract::gcd.missing_definition.3
+	 - Status: FAILURE
+	 - Description: "Function `gcd_failure_contract::gcd` with missing definition is unreachable"

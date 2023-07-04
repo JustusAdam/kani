@@ -1,7 +1,8 @@
 // Copyright Kani Contributors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
+// kani-flags: --check-contract max/main
 
-#[kani::ensures((result == x) | (result == y))]
+#[kani::ensures((*result == x) | (*result == y))]
 fn max(x: u32, y: u32) -> u32 {
     if x > y { x } else { y }
 }

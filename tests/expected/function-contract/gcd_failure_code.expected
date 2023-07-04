@@ -1,0 +1,15 @@
+Check 85: gcd_failure_code::gcd.missing_definition.3
+	 - Status: FAILURE
+	 - Description: "Function `gcd_failure_code::gcd` with missing definition is unreachable"
+
+Check 212: Frac::check_equals.assertion.2
+	 - Status: FAILURE
+	 - Description: "assertion failed: self.num % f2.num == 0"
+
+Check 220: Frac::check_equals.assertion.4
+	 - Status: FAILURE
+	 - Description: "assertion failed: self.den % f2.den == 0"
+
+Check 233: Frac::check_equals.assertion.7
+	 - Status: FAILURE
+	 - Description: "assertion failed: gcd1 == gcd2"
