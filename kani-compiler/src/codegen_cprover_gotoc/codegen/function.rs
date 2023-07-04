@@ -270,6 +270,11 @@ impl<'tcx> GotocCtx<'tcx> {
                 mir_arguments.iter().map(|l| mir::Operand::Copy((*l).into())).collect();
             let mut arguments = self.codegen_funcall_args(&mir_operands, true);
 
+            {
+                let old_args : Vec<_> = arguments.iter().map(|arg| arg.clone().old()).collect();
+                arguments.extend(old_args);
+            }
+
             let return_var_name = {
                 let return_var_name = self.codegen_var_name(&return_arg);
                 arguments.push(

@@ -234,6 +234,16 @@ mod sysroot {
             .into()
         }
     }
+    
+    use syn::{visit_mut::VisitMut, Receiver};
+
+    struct IdentToOldRewriter;
+
+    impl syn::visit_mut::VisitMut for IdentToOldRewriter {
+        fn visit_pat_ident_mut(&mut self, i: &mut syn::PatIdent) {
+            i.ident = Ident::new(&format!("old_{}", i.ident.to_string()), i.span())
+        }
+    }
 
     /// Rewrites function contract annotations (`requires`, `ensures`) by lifing
     /// the condition into a separate function. As an example: (using `ensures`)
@@ -287,6 +297,18 @@ mod sysroot {
         };
 
         let mut gen_fn_inputs = inputs.clone();
+        gen_fn_inputs.extend(
+            inputs.iter().map(|arg| match arg {
+                FnArg::Typed(ta) => {
+                    let mut old = ta.clone();
+                    IdentToOldRewriter.visit_pat_type_mut(&mut old);
+                    FnArg::Typed(old)
+                }
+                FnArg::Receiver(Receiver { attrs, reference: _, mutability, self_token: _, colon_token, ty }) => {
+                    FnArg::Typed(PatType { attrs: attrs.clone(), pat: Box::new(Pat::Ident(PatIdent { attrs: vec![], by_ref: None, mutability: mutability.clone(), ident: Ident::new("old_self", Span::mixed_site()), subpat: None})), colon_token: colon_token.clone().unwrap_or(Token![:](Span::mixed_site())), ty: ty.clone() })
+                }
+            })
+        );
         gen_fn_inputs.push(FnArg::Typed(PatType {
             attrs: vec![],
             pat: Box::new(Pat::Ident(PatIdent {
