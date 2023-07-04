@@ -575,10 +575,8 @@ mod contract_harnesses {
     use kani::Arbitrary;
 
     fn arbitrary_vec_map<K: Eq + Arbitrary, V: Arbitrary>() -> VecMap<K, V> {
-        let len = kani::any();
-        kani::assume(len < 4);
         let mut map = VecMap::new();
-        for _ in 0..len {
+        for _ in 0..4 {
             map.insert(kani::any(), kani::any());
         }
         map

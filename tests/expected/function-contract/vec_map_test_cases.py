@@ -41,30 +41,30 @@ TEST_FILE = "fixme_vec_map_example.rs"
 def run_tests(test_cases: abc.Iterable[TestCase], args):
     timeout = args.timeout
     for tc in test_cases:
-        if tc.skip is not None and args.index is None:
+        if tc.skip is not None and args.index is None and not args.noskip:
             print(f"Skipping function contract for {tc.function} because {tc.skip}")
             continue
         print(f"Checking function contract for {tc.function} on {tc.harness} ... ", end='', flush=True)
         try:
             ret = run(("kani", "--check-contract", f"{tc.function}/{tc.harness}", TEST_FILE), capture_output=True, timeout=timeout, text=True)
-            if not check_and_report_cmd_result(ret, args.fail_fast):
-                return
-            else:
+            if check_and_report_cmd_result(ret, args.fail_fast):
                 print("finished successfully")
+            elif args.fail_fast:
+                return
         except TimeoutExpired:
             print(f"timed out after {timeout}s")
             if args.fail_fast:
                 return
 
-def check_and_report_cmd_result(result, fail=True):
+def check_and_report_cmd_result(result, print_output=True):
     if result.returncode != 0:
-        print(f"exited with non-zero code {result.returncode}")
-        if fail:
+        print(f"exited with code {result.returncode}")
+        if print_output:
             print("------------ stdout ------------")
             print(result.stdout)
             print("------------ stderr ------------")
             print(result.stderr)
-            return False
+        return False
     return True
 
 def list_available():
@@ -75,20 +75,19 @@ def list_available():
         col_0_width = max(col_0_width, len(str(i)))
         col_1_width = max(col_1_width, len(tc.function))
         col_2_width = max(col_2_width, len(tc.harness))
-    def row(col1, col2, col3):
-        print(f" {col1:^{ col_0_width}} | {col2:^{ col_1_width}} | {col3:^{ col_2_width}}")
-    row('#', 'Function', 'Harness')
+    print(f" {'#':^{ col_0_width}} | {'Function':^{ col_1_width}} | {'Harness':^{ col_2_width}}")
     print(f"-{'' :-^{col_0_width}}-+-{''        :-^{col_1_width}}-+-{''       :-^{col_2_width}}")
     for i, tc in enumerate(TEST_CASES):
-        row(i, tc.function, tc.harness)
+        print(f" {i:>{ col_0_width}} | {tc.function:<{ col_1_width}} | {tc.harness:<{ col_2_width}}")
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--fail-fast", action="store_true", help="Abort after the first failed verification or timeout")
     parser.add_argument("--index", type=int, help="Run test with this number")
-    parser.add_argument("--timeout", type=float, help="Abandon verification after this many seconds")
+    parser.add_argument("--timeout", type=float, default=30.0, help="Abandon verification after this many seconds")
     parser.add_argument("--filter", help="Only run contracts which match this pattern")
     parser.add_argument("--list", action='store_true')
+    parser.add_argument("--noskip", action='store_true')
     args = parser.parse_args()
 
     if args.list:
