@@ -117,7 +117,7 @@ pub fn ensures(attr: TokenStream, item: TokenStream) -> TokenStream {
 }
 /// This module implements Kani attributes in a way that only Kani's compiler can understand.
 /// This code should only be activated when pre-building Kani's sysroot.
-//#[cfg(kani_sysroot)]
+#[cfg(kani_sysroot)]
 mod sysroot {
 
     use super::*;
@@ -321,8 +321,8 @@ mod sysroot {
                     pat: Box::new(Pat::Ident(PatIdent {
                         attrs: vec![],
                         by_ref: None,
-                        mutability: mutability.clone(),
-                        ident: Ident::new("old_self", Span::mixed_site()),
+                        mutability: None,
+                        ident: Ident::new("old_self", Span::call_site()),
                         subpat: None,
                     })),
                     colon_token: colon_token.clone().unwrap_or(Token![:](Span::mixed_site())),

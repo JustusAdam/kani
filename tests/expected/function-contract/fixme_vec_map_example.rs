@@ -93,8 +93,8 @@ impl<K, V> VecMap<K, V> {
         self.position(key).map(move |p| &mut self.values[p])
     }
 
-    //#[post(implies(!old(self.contains_key(&key)), result.is_none()))]
-    //#[post(implies(old(self.contains_key(&key)), result.is_some()))]
+    // #[post(implies(!old_self.contains_key(&key), result.is_none()))]
+    // #[post(implies(old_self.contains_key(&key), result.is_some()))]
     pub fn insert(&mut self, key: K, mut value: V) -> Option<V>
     where
         K: PartialEq,
@@ -132,8 +132,8 @@ impl<K, V> VecMap<K, V> {
         self.position(key).map(|p| (&self.keys[p], &self.values[p]))
     }
 
-    //#[post(implies(!old(self.contains_key(key)), result.is_none()))]
-    //#[post(implies(old(self.contains_key(key)), result.is_some()))]
+    #[post(implies(!old_self.contains_key(key), result.is_none()))]
+    #[post(implies(old_self.contains_key(key), result.is_some()))]
     #[post(self.contains_key(key) == false)]
     pub fn remove<Q: PartialEq<K> + ?Sized>(&mut self, key: &Q) -> Option<V> {
         if let Some(index) = self.position(key) {
@@ -154,8 +154,8 @@ impl<K, V> VecMap<K, V> {
         }
     }
 
-    //#[post(implies(!old(self.contains_key(key)), result.is_none()))]
-    //#[post(implies(old(self.contains_key(key)), result.is_some()))]
+    // #[post(implies(!old_self.contains_key(key), result.is_none()))]
+    // #[post(implies(old_self.contains_key(key), result.is_some()))]
     #[post(self.contains_key(key) == false)]
     pub fn remove_entry<Q: PartialEq<K> + ?Sized>(&mut self, key: &Q) -> Option<(K, V)> {
         if let Some(index) = self.position(key) {

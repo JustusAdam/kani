@@ -4,6 +4,8 @@ from pathlib import Path
 import os
 import argparse
 from collections import namedtuple, abc
+import time
+import shlex
 
 DEFAULT_KEY_TYPE = "u8"
 DEFAULT_VALUE_TYPE = "u8"
@@ -28,12 +30,12 @@ TEST_CASES = [
     TestCase(mvm("new", key_t = "u64", val_t = "std::option::Option<i32>"), ch("new_2")),
     TestCase(mvm("with_capacity"), ch("with_capacity")),
     TestCase(mvm("clear"), ch("clear"), skip="it times out"),
-    TestCase(mvm("get", method_types=[DEFAULT_KEY_TYPE]), ch("get"), skip=DEFAULT_TAKES_TOO_LONG),
-    TestCase(mvm("get_mut", method_types=[DEFAULT_KEY_TYPE]), ch("get_mut"), skip=DEFAULT_TAKES_TOO_LONG),
-    TestCase(mvm("insert"), ch("insert"), skip="`old` is not yet implemented"),
-    TestCase(mvm("get_key_value", method_types=[DEFAULT_KEY_TYPE]), ch("get_key_value"), skip=DEFAULT_TAKES_TOO_LONG),
-    TestCase(mvm("remove", method_types=[DEFAULT_KEY_TYPE]), ch("remove"), skip=DEFAULT_TAKES_TOO_LONG),
-    TestCase(mvm("remove_entry", method_types=[DEFAULT_KEY_TYPE]), ch("remove_entry"), skip=DEFAULT_TAKES_TOO_LONG)
+    TestCase(mvm("get", method_types=[DEFAULT_KEY_TYPE]), ch("get")),
+    TestCase(mvm("get_mut", method_types=[DEFAULT_KEY_TYPE]), ch("get_mut")),
+    TestCase(mvm("insert"), ch("insert")),
+    TestCase(mvm("get_key_value", method_types=[DEFAULT_KEY_TYPE]), ch("get_key_value")),
+    TestCase(mvm("remove", method_types=[DEFAULT_KEY_TYPE]), ch("remove")),
+    TestCase(mvm("remove_entry", method_types=[DEFAULT_KEY_TYPE]), ch("remove_entry"))
 ]
 
 TEST_FILE = "fixme_vec_map_example.rs"
@@ -44,11 +46,17 @@ def run_tests(test_cases: abc.Iterable[TestCase], args):
         if tc.skip is not None and args.index is None and not args.noskip:
             print(f"Skipping function contract for {tc.function} because {tc.skip}")
             continue
+
+        cmd = ("kani", "--default-unwind", "10", "--check-contract", f"{tc.function}/{tc.harness}", args.test_file)
+        if args.echo_commands:
+            print(shlex.join(cmd))
         print(f"Checking function contract for {tc.function} on {tc.harness} ... ", end='', flush=True)
         try:
-            ret = run(("kani", "--check-contract", f"{tc.function}/{tc.harness}", TEST_FILE), capture_output=True, timeout=timeout, text=True)
+            before = time.time()
+            ret = run(cmd, capture_output=True, timeout=timeout, text=True)
             if check_and_report_cmd_result(ret, args.fail_fast):
-                print("finished successfully")
+                after = time.time()
+                print(f"finished successfully in {round(after - before, ndigits=1)} seconds")
             elif args.fail_fast:
                 return
         except TimeoutExpired:
@@ -88,6 +96,8 @@ def main():
     parser.add_argument("--filter", help="Only run contracts which match this pattern")
     parser.add_argument("--list", action='store_true')
     parser.add_argument("--noskip", action='store_true')
+    parser.add_argument("--echo-commands", action='store_true')
+    parser.add_argument("--test-file", default=TEST_FILE)
     args = parser.parse_args()
 
     if args.list:
