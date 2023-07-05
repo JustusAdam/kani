@@ -250,7 +250,7 @@ impl<'tcx> GotocCtx<'tcx> {
     #[cfg(not(feature = "inlined-goto-contracts"))]
     fn as_goto_contract(&mut self, fn_contract: &GFnContract<Instance<'tcx>>) -> FunctionContract {
         use rustc_middle::mir;
-        let mut handle_contract_expr = |instance| {
+        let mut handle_contract_expr = |instance, append_old| {
             let goto_annotated_fn_name = self.current_fn().name();
             let goto_annotated_fn_typ = self
                 .symbol_table
@@ -270,8 +270,8 @@ impl<'tcx> GotocCtx<'tcx> {
                 mir_arguments.iter().map(|l| mir::Operand::Copy((*l).into())).collect();
             let mut arguments = self.codegen_funcall_args(&mir_operands, true);
 
-            {
-                let old_args : Vec<_> = arguments.iter().map(|arg| arg.clone().old()).collect();
+            if append_old {
+                let old_args: Vec<_> = arguments.iter().map(|arg| arg.clone().old()).collect();
                 arguments.extend(old_args);
             }
 
@@ -302,10 +302,18 @@ impl<'tcx> GotocCtx<'tcx> {
             )
         };
 
-        let requires =
-            fn_contract.requires().iter().copied().map(&mut handle_contract_expr).collect();
-        let ensures =
-            fn_contract.ensures().iter().copied().map(&mut handle_contract_expr).collect();
+        let requires = fn_contract
+            .requires()
+            .iter()
+            .copied()
+            .map(|contract| handle_contract_expr(contract, false))
+            .collect();
+        let ensures = fn_contract
+            .ensures()
+            .iter()
+            .copied()
+            .map(|contract| handle_contract_expr(contract, true))
+            .collect();
         FunctionContract::new(requires, ensures, vec![])
     }
 

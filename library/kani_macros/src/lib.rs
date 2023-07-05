@@ -234,7 +234,7 @@ mod sysroot {
             .into()
         }
     }
-    
+
     use syn::{visit_mut::VisitMut, Receiver};
 
     struct IdentToOldRewriter;
@@ -269,7 +269,12 @@ mod sysroot {
     ///
     /// This macro is supposed to be called with the name of the procedural
     /// macro it should generate, e.g. `requires_ensures(requires)`
-    fn handle_requires_ensures(name: &str, attr: TokenStream, item: TokenStream) -> TokenStream {
+    fn handle_requires_ensures(
+        name: &str,
+        append_old: bool,
+        attr: TokenStream,
+        item: TokenStream,
+    ) -> TokenStream {
         use proc_macro2::Span;
         use syn::{
             punctuated::Punctuated, FnArg, Pat, PatIdent, PatType, ReturnType, Signature, Token,
@@ -297,18 +302,34 @@ mod sysroot {
         };
 
         let mut gen_fn_inputs = inputs.clone();
-        gen_fn_inputs.extend(
-            inputs.iter().map(|arg| match arg {
+        if append_old {
+            gen_fn_inputs.extend(inputs.iter().map(|arg| match arg {
                 FnArg::Typed(ta) => {
                     let mut old = ta.clone();
                     IdentToOldRewriter.visit_pat_type_mut(&mut old);
                     FnArg::Typed(old)
                 }
-                FnArg::Receiver(Receiver { attrs, reference: _, mutability, self_token: _, colon_token, ty }) => {
-                    FnArg::Typed(PatType { attrs: attrs.clone(), pat: Box::new(Pat::Ident(PatIdent { attrs: vec![], by_ref: None, mutability: mutability.clone(), ident: Ident::new("old_self", Span::mixed_site()), subpat: None})), colon_token: colon_token.clone().unwrap_or(Token![:](Span::mixed_site())), ty: ty.clone() })
-                }
-            })
-        );
+                FnArg::Receiver(Receiver {
+                    attrs,
+                    reference: _,
+                    mutability,
+                    self_token: _,
+                    colon_token,
+                    ty,
+                }) => FnArg::Typed(PatType {
+                    attrs: attrs.clone(),
+                    pat: Box::new(Pat::Ident(PatIdent {
+                        attrs: vec![],
+                        by_ref: None,
+                        mutability: mutability.clone(),
+                        ident: Ident::new("old_self", Span::mixed_site()),
+                        subpat: None,
+                    })),
+                    colon_token: colon_token.clone().unwrap_or(Token![:](Span::mixed_site())),
+                    ty: ty.clone(),
+                }),
+            }));
+        }
         gen_fn_inputs.push(FnArg::Typed(PatType {
             attrs: vec![],
             pat: Box::new(Pat::Ident(PatIdent {
@@ -370,11 +391,11 @@ mod sysroot {
     }
 
     pub fn requires(attr: TokenStream, item: TokenStream) -> TokenStream {
-        handle_requires_ensures("requires", attr, item)
+        handle_requires_ensures("requires", false, attr, item)
     }
 
     pub fn ensures(attr: TokenStream, item: TokenStream) -> TokenStream {
-        handle_requires_ensures("ensures", attr, item)
+        handle_requires_ensures("ensures", true, attr, item)
     }
 
     kani_attribute!(should_panic, no_args);
