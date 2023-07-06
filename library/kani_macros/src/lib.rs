@@ -115,6 +115,12 @@ pub fn requires(attr: TokenStream, item: TokenStream) -> TokenStream {
 pub fn ensures(attr: TokenStream, item: TokenStream) -> TokenStream {
     attr_impl::ensures(attr, item)
 }
+
+#[proc_macro_attribute]
+pub fn assigns(attr: TokenStream, item: TokenStream) -> TokenStream {
+    attr_impl::assigns(attr, item)
+}
+
 /// This module implements Kani attributes in a way that only Kani's compiler can understand.
 /// This code should only be activated when pre-building Kani's sysroot.
 #[cfg(kani_sysroot)]
@@ -398,6 +404,16 @@ mod sysroot {
         handle_requires_ensures("ensures", true, attr, item)
     }
 
+    pub fn assigns(attr: TokenStream, item: TokenStream) -> TokenStream {
+        let item = proc_macro2::TokenStream::from(item);
+        let attr = proc_macro2::TokenStream::from(attr);
+        quote!(
+            #[kanitool::assigns(#attr)]
+            #item
+        )
+        .into()
+    }
+
     kani_attribute!(should_panic, no_args);
     kani_attribute!(solver);
     kani_attribute!(stub);
@@ -437,4 +453,5 @@ mod regular {
     no_op!(unwind);
     no_op!(requires);
     no_op!(ensures);
+    no_op!(assigns);
 }

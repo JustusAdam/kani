@@ -8,7 +8,7 @@ use crate::kani_middle::contracts::GFnContract;
 use cbmc::goto_program::{Expr, FunctionContract, Lambda, Stmt, Symbol, Type};
 use cbmc::InternString;
 use rustc_middle::mir::traversal::reverse_postorder;
-use rustc_middle::mir::{Body, HasLocalDecls, Local};
+use rustc_middle::mir::{Body, HasLocalDecls, Local, Place};
 use rustc_middle::ty::{self, Instance};
 use std::collections::BTreeMap;
 use std::iter::FromIterator;
@@ -248,16 +248,21 @@ impl<'tcx> GotocCtx<'tcx> {
     /// calls the generated spec function, but passing the return value as the
     /// last argument.
     #[cfg(not(feature = "inlined-goto-contracts"))]
-    fn as_goto_contract(&mut self, fn_contract: &GFnContract<Instance<'tcx>>) -> FunctionContract {
+    fn as_goto_contract(
+        &mut self,
+        fn_contract: &GFnContract<Instance<'tcx>, Place<'tcx>>,
+    ) -> FunctionContract {
         use rustc_middle::mir;
+
+        let goto_annotated_fn_name = self.current_fn().name();
+        let goto_annotated_fn_typ = self
+            .symbol_table
+            .lookup(goto_annotated_fn_name)
+            .expect("Function must have been declared")
+            .typ
+            .clone();
+
         let mut handle_contract_expr = |instance, append_old| {
-            let goto_annotated_fn_name = self.current_fn().name();
-            let goto_annotated_fn_typ = self
-                .symbol_table
-                .lookup(goto_annotated_fn_name)
-                .expect("Function must have been declared")
-                .typ
-                .clone();
             let mir = self.current_fn().mir();
             assert!(mir.spread_arg.is_none());
             let func_expr = self.codegen_func_expr(instance, None);
@@ -314,7 +319,18 @@ impl<'tcx> GotocCtx<'tcx> {
             .copied()
             .map(|contract| handle_contract_expr(contract, true))
             .collect();
-        FunctionContract::new(requires, ensures, vec![])
+        let assigns = fn_contract
+            .assigns()
+            .iter()
+            .map(|lval| {
+                Lambda::as_contract_for(
+                    &goto_annotated_fn_typ,
+                    None,
+                    self.codegen_place(lval).unwrap().goto_expr,
+                )
+            })
+            .collect();
+        FunctionContract::new(requires, ensures, assigns)
     }
 
     #[cfg(feature = "inlined-goto-contracts")]
@@ -403,7 +419,7 @@ impl<'tcx> GotocCtx<'tcx> {
     pub fn attach_contract(
         &mut self,
         instance: Instance<'tcx>,
-        contract: &GFnContract<Instance<'tcx>>,
+        contract: &GFnContract<Instance<'tcx>, Place<'tcx>>,
     ) {
         // This should be safe, since the contract is pretty much evaluated as
         // though it was the first (or last) assertion in the function.

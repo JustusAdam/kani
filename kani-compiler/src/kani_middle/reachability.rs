@@ -27,7 +27,7 @@ use rustc_middle::mir::interpret::{AllocId, ConstValue, ErrorHandled, GlobalAllo
 use rustc_middle::mir::mono::MonoItem;
 use rustc_middle::mir::visit::Visitor as MirVisitor;
 use rustc_middle::mir::{
-    AggregateKind, Body, CastKind, Constant, ConstantKind, Location, Rvalue, Terminator,
+    AggregateKind, Body, CastKind, Constant, ConstantKind, Location, Place, Rvalue, Terminator,
     TerminatorKind,
 };
 use rustc_middle::span_bug;
@@ -47,7 +47,7 @@ use super::contracts::GFnContract;
 pub fn collect_reachable_items<'tcx>(
     tcx: TyCtxt<'tcx>,
     starting_points: &[MonoItem<'tcx>],
-) -> Vec<(MonoItem<'tcx>, Option<GFnContract<Instance<'tcx>>>)> {
+) -> Vec<(MonoItem<'tcx>, Option<GFnContract<Instance<'tcx>, Place<'tcx>>>)> {
     // For each harness, collect items using the same collector.
     // I.e.: This will return any item that is reachable from one or more of the starting points.
     let mut collector = MonoItemsCollector::new(tcx);
@@ -150,7 +150,7 @@ struct MonoItemsCollector<'tcx> {
     /// The compiler context.
     tcx: TyCtxt<'tcx>,
     /// Set of collected items used to avoid entering recursion loops.
-    collected: FxHashMap<MonoItem<'tcx>, Option<GFnContract<Instance<'tcx>>>>,
+    collected: FxHashMap<MonoItem<'tcx>, Option<GFnContract<Instance<'tcx>, Place<'tcx>>>>,
     /// Items enqueued for visiting.
     queue: Vec<MonoItem<'tcx>>,
     #[cfg(debug_assertions)]
@@ -185,7 +185,7 @@ impl<'tcx> MonoItemsCollector<'tcx> {
                         _ => rustc_middle::ty::List::empty(),
                     };
                     let contract =
-                        attributes::extract_contract(self.tcx, local_def_id).map(|def_id| {
+                        attributes::extract_contract(self.tcx, local_def_id).map_c(|def_id| {
                             Instance::resolve(self.tcx, ParamEnv::reveal_all(), *def_id, substs)
                                 .unwrap()
                                 .expect("No specific instance found")

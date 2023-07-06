@@ -5,16 +5,22 @@
 use std::collections::BTreeMap;
 
 use kani_metadata::{CbmcSolver, HarnessAttributes, Stub};
+use rustc_abi::FIRST_VARIANT;
 use rustc_ast::{
-    attr, AttrArgs, AttrArgsEq, AttrKind, Attribute, LitKind, MetaItem, MetaItemKind,
-    NestedMetaItem,
+    attr,
+    token::{BinOpToken, Delimiter, Token, TokenKind},
+    tokenstream::{TokenStream, TokenTree},
+    AttrArgs, AttrArgsEq, AttrKind, Attribute, LitKind, MetaItem, MetaItemKind, NestedMetaItem,
 };
 use rustc_errors::ErrorGuaranteed;
 use rustc_hir::{
     def::DefKind,
     def_id::{DefId, LocalDefId},
 };
-use rustc_middle::ty::{Instance, TyCtxt, TyKind};
+use rustc_middle::{
+    mir::{Place, ProjectionElem},
+    ty::{Instance, TyCtxt, TyKind},
+};
 use rustc_span::Span;
 use std::str::FromStr;
 use strum_macros::{AsRefStr, EnumString};
@@ -35,6 +41,7 @@ enum KaniAttributeKind {
     Unwind,
     Requires,
     Ensures,
+    Assigns,
 }
 
 impl KaniAttributeKind {
@@ -48,7 +55,8 @@ impl KaniAttributeKind {
             | KaniAttributeKind::Unwind => true,
             KaniAttributeKind::Unstable
             | KaniAttributeKind::Ensures
-            | KaniAttributeKind::Requires => false,
+            | KaniAttributeKind::Requires
+            | KaniAttributeKind::Assigns => false,
         }
     }
 }
@@ -101,7 +109,9 @@ pub(super) fn check_attributes(tcx: TyCtxt, def_id: DefId) {
             KaniAttributeKind::Unstable => attrs.iter().for_each(|attr| {
                 let _ = UnstableAttribute::try_from(*attr).map_err(|err| err.report(tcx));
             }),
-            KaniAttributeKind::Ensures | KaniAttributeKind::Requires => (),
+            KaniAttributeKind::Ensures
+            | KaniAttributeKind::Requires
+            | KaniAttributeKind::Assigns => (),
         };
     }
 }
@@ -123,7 +133,10 @@ pub fn is_proof_harness(tcx: TyCtxt, def_id: DefId) -> bool {
 
 pub fn is_contract(tcx: TyCtxt, def_id: DefId) -> bool {
     has_kani_attribute(tcx, def_id, |a| {
-        matches!(a, KaniAttributeKind::Ensures | KaniAttributeKind::Requires)
+        matches!(
+            a,
+            KaniAttributeKind::Ensures | KaniAttributeKind::Requires | KaniAttributeKind::Assigns
+        )
     })
 }
 
@@ -165,7 +178,9 @@ pub fn extract_harness_attributes(tcx: TyCtxt, def_id: DefId) -> HarnessAttribut
                 // Internal attribute which shouldn't exist here.
                 unreachable!()
             }
-            KaniAttributeKind::Ensures | KaniAttributeKind::Requires => {
+            KaniAttributeKind::Ensures
+            | KaniAttributeKind::Requires
+            | KaniAttributeKind::Assigns => {
                 todo!("Contract attributes are not supported on proofs (yet)")
             }
         };
@@ -231,7 +246,98 @@ pub fn extract_contract(tcx: TyCtxt, local_def_id: LocalDefId) -> super::contrac
         attributes.get(&KaniAttributeKind::Requires).map_or_else(Vec::new, parse_and_resolve);
     let ensures =
         attributes.get(&KaniAttributeKind::Ensures).map_or_else(Vec::new, parse_and_resolve);
-    super::contracts::FnContract::new(requires, ensures, vec![])
+    let assigns = attributes.get(&KaniAttributeKind::Assigns).map_or_else(Vec::new, |attr| {
+        attr.iter()
+            .flat_map(|clause| match &clause.get_normal_item().args {
+                AttrArgs::Delimited(lvals) => parse_assign_values(tcx, local_def_id, &lvals.tokens),
+                _ => unreachable!(),
+            })
+            .collect()
+    });
+    super::contracts::FnContract::new(requires, ensures, assigns)
+}
+
+fn parse_assign_values<'tcx: 'a, 'a>(
+    tcx: TyCtxt<'tcx>,
+    local_def_id: LocalDefId,
+    t: &'a TokenStream,
+) -> impl Iterator<Item = Place<'tcx>> + 'a {
+    fn parse_one<'tcx, 'b>(
+        tcx: TyCtxt<'tcx>,
+        local_def_id: LocalDefId,
+        t: &mut impl Iterator<Item = &'b TokenTree>,
+    ) -> Place<'tcx> {
+        let mir = tcx.optimized_mir(local_def_id);
+        let local_decls = &mir.local_decls;
+        if let Some(tree) = t.next() {
+            let mut base = match tree {
+                TokenTree::Delimited(_, Delimiter::Parenthesis, inner) => {
+                    let mut it = inner.trees();
+                    let res = parse_one(tcx, local_def_id, &mut it);
+                    assert!(it.next().is_none());
+                    res
+                }
+                TokenTree::Token(token, _) => match &token.kind {
+                    TokenKind::Ident(id, _) => {
+                        let hir = tcx.hir();
+                        let bid = hir.body_owned_by(local_def_id);
+                        let local = hir
+                            .body_param_names(bid)
+                            .zip(mir.args_iter())
+                            .find(|(name, _decl)| name.name == *id)
+                            .unwrap()
+                            .1;
+                        Place::from(local)
+                    }
+                    TokenKind::BinOp(BinOpToken::Star) => parse_one(tcx, local_def_id, t)
+                        .project_deeper(&[ProjectionElem::Deref], tcx),
+                    _ => panic!("Parse error, unexpected token {:?}", tree),
+                },
+                _ => panic!("Parse error, unexpected token {:?}", tree),
+            };
+            while let Some(tree) = t.next() {
+                match tree {
+                    TokenTree::Token(token, _) => match &token.kind {
+                        TokenKind::Dot => match t.next() {
+                            Some(TokenTree::Token(
+                                Token { kind: TokenKind::Ident(field, _), .. },
+                                _,
+                            )) => {
+                                let pty = base.ty(local_decls, tcx);
+                                let (adt_def, _) = match pty.ty.kind() {
+                                    TyKind::Adt(adt, substs) => (adt, substs),
+                                    _ => panic!(),
+                                };
+                                let variant_index = pty.variant_index.unwrap_or_else(|| {
+                                    assert!(adt_def.is_struct());
+                                    FIRST_VARIANT
+                                });
+                                let fidx = adt_def
+                                    .variant(variant_index)
+                                    .fields
+                                    .iter_enumerated()
+                                    .find(|(_idx, fdef)| fdef.name == *field)
+                                    .unwrap()
+                                    .0;
+                                let more_projections =
+                                    [ProjectionElem::Field(fidx, pty.field_ty(tcx, fidx))];
+                                base = base.project_deeper(&more_projections, tcx);
+                            }
+                            thing => panic!("Incomplete field expression {thing:?}"),
+                        },
+                        TokenKind::Comma => break,
+                        _ => panic!("Unexpected token {tree:?}"),
+                    },
+                    tok => panic!("Unexpected token {tok:?}"),
+                }
+            }
+            base
+        } else {
+            panic!()
+        }
+    }
+    let mut it = t.trees().peekable();
+    std::iter::from_fn(move || it.peek().is_some().then(|| parse_one(tcx, local_def_id, &mut it)))
 }
 
 /// Check that any unstable API has been enabled. Otherwise, emit an error.
