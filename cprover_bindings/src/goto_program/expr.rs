@@ -177,9 +177,10 @@ pub enum ExprValue {
     /// A special expression type used in `assigns` contract clauses. See
     /// <https://diffblue.github.io/cbmc/contracts-assigns.html>
     ConditionalTargetGroup {
-        condition: Option<Box<Expr>>,
+        condition: Box<Expr>,
         targets: Vec<MemoryTarget>,
     },
+    MemoryTarget(MemoryTarget),
 }
 
 #[derive(Clone, Debug, Copy, Eq, PartialEq, PartialOrd)]
@@ -943,11 +944,11 @@ impl Expr {
 
     /// Create a conditional target group with this expression as the condition
     pub fn with_target_group(self, targets: Vec<MemoryTarget>) -> Self {
-        expr!(ConditionalTargetGroup { condition: Some(Box::new(self)), targets }, Type::Empty)
+        expr!(ConditionalTargetGroup { condition: Box::new(self), targets }, Type::Empty)
     }
 
-    pub fn unconditional_target_group(targets: Vec<MemoryTarget>) -> Self {
-        expr!(ConditionalTargetGroup { condition: None, targets }, Type::Empty)
+    pub fn unconditional_target_group(target: MemoryTarget) -> Self {
+        expr!(MemoryTarget(target), Type::Empty)
     }
 }
 

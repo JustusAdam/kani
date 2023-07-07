@@ -332,7 +332,7 @@ impl<'tcx> GotocCtx<'tcx> {
                         let target = MemoryTarget::ObjectWhole(
                             self.codegen_place(&last_popped).unwrap().goto_expr,
                         );
-                        Expr::unconditional_target_group(vec![target])
+                        Expr::unconditional_target_group(target)
                     }
                     _ => self.codegen_place(lval).unwrap().goto_expr,
                 };

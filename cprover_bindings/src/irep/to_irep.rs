@@ -376,19 +376,19 @@ impl ToIrep for ExprValue {
                 sub: vec![inner.to_irep(mm)],
                 named_sub: linear_map!((IrepId::Type, inner.typ().to_irep(mm))),
             },
-            ExprValue::ConditionalTargetGroup { condition: opt_cond, targets } => Irep {
+            ExprValue::ConditionalTargetGroup { condition, targets } => Irep {
                 id: IrepId::ConditionalTargetGroup,
-                sub: opt_cond
-                    .into_iter()
-                    .map(|condition| condition.to_irep(mm))
-                    .chain([Irep {
+                sub: vec![
+                    condition.to_irep(mm),
+                    Irep {
                         id: IrepId::ExpressionList,
                         sub: targets.iter().map(|t| t.to_irep(mm)).collect(),
                         named_sub: linear_map!(),
-                    }])
-                    .collect(),
+                    }
+                ],
                 named_sub: linear_map![],
             },
+            ExprValue::MemoryTarget(target) => target.to_irep(mm),
         }
     }
 }
