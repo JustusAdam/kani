@@ -32,7 +32,7 @@ TEST_CASES = [
     TestCase(mvm("clear"), ch("clear")),
     TestCase(mvm("get", method_types=[DEFAULT_KEY_TYPE]), ch("get")),
     TestCase(mvm("get_mut", method_types=[DEFAULT_KEY_TYPE]), ch("get_mut")),
-    TestCase(mvm("insert"), ch("insert")),
+    TestCase(mvm("insert"), ch("insert"), skip="`old` is not implemented"),
     TestCase(mvm("get_key_value", method_types=[DEFAULT_KEY_TYPE]), ch("get_key_value")),
     TestCase(mvm("remove", method_types=[DEFAULT_KEY_TYPE]), ch("remove")),
     TestCase(mvm("remove_entry", method_types=[DEFAULT_KEY_TYPE]), ch("remove_entry"))
@@ -44,7 +44,7 @@ def run_tests(test_cases: abc.Iterable[TestCase], args):
     timeout = args.timeout
     for tc in test_cases:
         if tc.skip is not None and args.index is None and not args.noskip:
-            print(f"Skipping function contract for {tc.function} because {tc.skip}")
+            print(f"{TC.lightblue}Skipping function contract for {tc.function}{TC.reset} because {tc.skip}")
             continue
 
         cmd = ("kani", "--default-unwind", "10", "--check-contract", f"{tc.function}/{tc.harness}", args.test_file)
@@ -56,17 +56,17 @@ def run_tests(test_cases: abc.Iterable[TestCase], args):
             ret = run(cmd, capture_output=True, timeout=timeout, text=True)
             if check_and_report_cmd_result(ret, args.fail_fast):
                 after = time.time()
-                print(f"finished successfully in {round(after - before, ndigits=1)} seconds")
+                print(f"{TC.green}finished successfully{TC.reset} in {round(after - before, ndigits=1)} seconds")
             elif args.fail_fast:
                 return
         except TimeoutExpired:
-            print(f"timed out after {timeout}s")
+            print(f"{TC.yellow}timed out{TC.reset} after {timeout}s")
             if args.fail_fast:
                 return
 
 def check_and_report_cmd_result(result, print_output=True):
     if result.returncode != 0:
-        print(f"exited with code {result.returncode}")
+        print(f"{TC.red}failure{TC.reset}, exited with code {result.returncode}")
         if print_output:
             print("------------ stdout ------------")
             print(result.stdout)
@@ -87,6 +87,13 @@ def list_available():
     print(f"-{'' :-^{col_0_width}}-+-{''        :-^{col_1_width}}-+-{''       :-^{col_2_width}}")
     for i, tc in enumerate(TEST_CASES):
         print(f" {i:>{ col_0_width}} | {tc.function:<{ col_1_width}} | {tc.harness:<{ col_2_width}}")
+
+class TC:
+    reset = '\033[0m' 
+    green = '\033[32m'
+    red = '\033[31m'
+    yellow = '\033[93m'
+    lightblue = '\033[94m'
 
 def main():
     parser = argparse.ArgumentParser()
@@ -113,7 +120,7 @@ def main():
     build_res = run(["cargo", "build-dev"], cwd=basedir, capture_output=True)
     if not check_and_report_cmd_result(build_res):
         return
-    print("done")
+    print(f"{TC.green}done{TC.reset}")
 
     oldpath = os.environ["PATH"]
 
@@ -122,7 +129,8 @@ def main():
 
     test_cases = TEST_CASES 
     if args.index is not None:
-        assert args.filter is None, "Cannot specify --filter and --index together"
+        assert args.filter is None, f"{TC.red}Cannot specify --filter and --index together{TC.reset}"
+        assert args.filter < len(TEST_CASES), f"{TC.red}index ({args.index}) must be smaller than the number of test cases ({len(TEST_CASES)}){TC.reset}"
         test_cases = [TEST_CASES[args.index]]
     elif args.filter is not None:
         test_cases = [
@@ -130,6 +138,11 @@ def main():
             for tc in TEST_CASES
             if args.filter in tc.function
         ]
+    
+    if len(test_cases) == 0:
+        print(f"{TC.yellow}Your filter is too strict and selected no test cases{TC.reset}, available test cases are:")
+        list_available()
+        return
 
     run_tests(test_cases, args)
 
