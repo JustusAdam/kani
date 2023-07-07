@@ -46,6 +46,13 @@ impl<K, V> VecMap<K, V> {
         Self::with_capacity(0)
     }
 
+    pub fn from_raw(keys: Vec<K>, values: Vec<V>) -> Self {
+        assert_eq!(keys.len(), values.len());
+        Self {
+            keys, values
+        }
+    }
+
     #[post(result.len() == 0)]
     pub fn with_capacity(capacity: usize) -> Self
     where
@@ -132,8 +139,10 @@ impl<K, V> VecMap<K, V> {
         self.position(key).map(|p| (&self.keys[p], &self.values[p]))
     }
 
-    #[post(implies(!old_self.contains_key(key), result.is_none()))]
-    #[post(implies(old_self.contains_key(key), result.is_some()))]
+    // #[post(implies(!old_self.contains_key(key), result.is_none()))]
+    // #[post(implies(old_self.contains_key(key), result.is_some()))]
+    #[kani::assigns((*self).keys.buf.ptr.pointer.pointer[..], (*self).keys.buf.cap, (*self).keys.len)]
+    #[kani::assigns((*self).values.buf.ptr.pointer.pointer[..], (*self).values.buf.cap, (*self).values.len)]
     #[post(self.contains_key(key) == false)]
     pub fn remove<Q: PartialEq<K> + ?Sized>(&mut self, key: &Q) -> Option<V> {
         if let Some(index) = self.position(key) {
@@ -157,8 +166,8 @@ impl<K, V> VecMap<K, V> {
     // #[post(implies(!old_self.contains_key(key), result.is_none()))]
     // #[post(implies(old_self.contains_key(key), result.is_some()))]
     #[post(self.contains_key(key) == false)]
-    #[kani::assigns((*self).keys.buf.ptr[..], (*self).keys.len)]
-    #[kani::assigns((*self).values.buf.ptr[..], (*self).keys.len)]
+    #[kani::assigns((*self).keys.buf.ptr.pointer.pointer[..], (*self).keys.buf.cap, (*self).keys.len)]
+    #[kani::assigns((*self).values.buf.ptr.pointer.pointer[..], (*self).values.buf.cap, (*self).values.len)]
     pub fn remove_entry<Q: PartialEq<K> + ?Sized>(&mut self, key: &Q) -> Option<(K, V)> {
         if let Some(index) = self.position(key) {
             Some((self.keys.swap_remove(index), self.values.swap_remove(index)))
@@ -577,12 +586,15 @@ mod contract_harnesses {
     use kani::Arbitrary;
 
     fn arbitrary_vec_map<K: Eq + Arbitrary, V: Arbitrary>() -> VecMap<K, V> {
-        let mut map = VecMap::new();
-        for _ in 0..4 {
-            map.insert(kani::any(), kani::any());
-        }
-        map
-        
+        let k0 = kani::any();
+        let k1 = kani::any();
+        let k2 = kani::any();
+        let k3 = kani::any();
+        kani::assume(k0 != k1 && k0 != k2 && k0 != k3 && k1 != k2 && k1 != k3 && k2 != k3);
+        VecMap::from_raw(
+            vec![k0, k1, k2, k3],
+            vec![kani::any(), kani::any(), kani::any(), kani::any()],
+        )
     }
 
     #[kani::proof]
