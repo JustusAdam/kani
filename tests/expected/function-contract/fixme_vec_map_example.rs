@@ -157,6 +157,8 @@ impl<K, V> VecMap<K, V> {
     // #[post(implies(!old_self.contains_key(key), result.is_none()))]
     // #[post(implies(old_self.contains_key(key), result.is_some()))]
     #[post(self.contains_key(key) == false)]
+    #[kani::assigns((*self).keys.buf.ptr[..], (*self).keys.len)]
+    #[kani::assigns((*self).values.buf.ptr[..], (*self).keys.len)]
     pub fn remove_entry<Q: PartialEq<K> + ?Sized>(&mut self, key: &Q) -> Option<(K, V)> {
         if let Some(index) = self.position(key) {
             Some((self.keys.swap_remove(index), self.values.swap_remove(index)))

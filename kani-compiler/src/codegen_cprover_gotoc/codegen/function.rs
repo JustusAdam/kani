@@ -252,7 +252,10 @@ impl<'tcx> GotocCtx<'tcx> {
         &mut self,
         fn_contract: &GFnContract<Instance<'tcx>, Place<'tcx>>,
     ) -> FunctionContract {
+        use cbmc::goto_program::MemoryTarget;
         use rustc_middle::mir;
+
+        use crate::kani_middle::attributes::wildcard_subslice;
 
         let goto_annotated_fn_name = self.current_fn().name();
         let goto_annotated_fn_typ = self
@@ -323,11 +326,17 @@ impl<'tcx> GotocCtx<'tcx> {
             .assigns()
             .iter()
             .map(|lval| {
-                Lambda::as_contract_for(
-                    &goto_annotated_fn_typ,
-                    None,
-                    self.codegen_place(lval).unwrap().goto_expr,
-                )
+                let body = match lval.projection.split_last() {
+                    Some((elem, rest)) if *elem == wildcard_subslice() => {
+                        let last_popped = Place::from(lval.local).project_deeper(rest, self.tcx);
+                        let target = MemoryTarget::ObjectWhole(
+                            self.codegen_place(&last_popped).unwrap().goto_expr,
+                        );
+                        Expr::unconditional_target_group(vec![target])
+                    }
+                    _ => self.codegen_place(lval).unwrap().goto_expr,
+                };
+                Lambda::as_contract_for(&goto_annotated_fn_typ, None, body)
             })
             .collect();
         FunctionContract::new(requires, ensures, assigns)

@@ -18,7 +18,7 @@ use rustc_hir::{
     def_id::{DefId, LocalDefId},
 };
 use rustc_middle::{
-    mir::{Place, ProjectionElem},
+    mir::{Place, PlaceElem, ProjectionElem},
     ty::{Instance, TyCtxt, TyKind},
 };
 use rustc_span::Span;
@@ -188,6 +188,10 @@ pub fn extract_harness_attributes(tcx: TyCtxt, def_id: DefId) -> HarnessAttribut
     })
 }
 
+pub fn wildcard_subslice<'tcx>() -> PlaceElem<'tcx> {
+    ProjectionElem::Subslice { from: u64::MAX, to: u64::MAX, from_end: false }
+}
+
 /// Extract function contracts on this item.
 ///
 /// This parses the annotation and resolves the mentioned implementation
@@ -270,7 +274,7 @@ fn parse_assign_values<'tcx: 'a, 'a>(
         let mir = tcx.optimized_mir(local_def_id);
         let local_decls = &mir.local_decls;
         if let Some(tree) = t.next() {
-            let mut base = match tree {
+            let mut base: Place<'tcx> = match tree {
                 TokenTree::Delimited(_, Delimiter::Parenthesis, inner) => {
                     let mut it = inner.trees();
                     let res = parse_one(tcx, local_def_id, &mut it);
@@ -295,8 +299,14 @@ fn parse_assign_values<'tcx: 'a, 'a>(
                 },
                 _ => panic!("Parse error, unexpected token {:?}", tree),
             };
+            macro_rules! comma_tok {
+                () => {
+                    TokenTree::Token(Token { kind: TokenKind::Comma, .. }, _)
+                };
+            }
             while let Some(tree) = t.next() {
                 match tree {
+                    comma_tok!() => break,
                     TokenTree::Token(token, _) => match &token.kind {
                         TokenKind::Dot => match t.next() {
                             Some(TokenTree::Token(
@@ -317,7 +327,9 @@ fn parse_assign_values<'tcx: 'a, 'a>(
                                     .fields
                                     .iter_enumerated()
                                     .find(|(_idx, fdef)| fdef.name == *field)
-                                    .unwrap()
+                                    .unwrap_or_else(|| {
+                                        panic!("Could not find field {field} in type {:?}", pty.ty)
+                                    })
                                     .0;
                                 let more_projections =
                                     [ProjectionElem::Field(fidx, pty.field_ty(tcx, fidx))];
@@ -325,9 +337,20 @@ fn parse_assign_values<'tcx: 'a, 'a>(
                             }
                             thing => panic!("Incomplete field expression {thing:?}"),
                         },
-                        TokenKind::Comma => break,
                         _ => panic!("Unexpected token {tree:?}"),
                     },
+                    TokenTree::Delimited(_, Delimiter::Bracket, inner) => {
+                        match inner.trees().collect::<Vec<_>>().as_slice() {
+                            [TokenTree::Token(Token { kind: TokenKind::DotDot, .. }, _)] => {
+                                assert!(
+                                    matches!(t.next(), None | Some(comma_tok!())),
+                                    "Wildcard slice pattern is only supported as last projection"
+                                );
+                                return base.project_deeper(&[wildcard_subslice()], tcx);
+                            }
+                            _ => panic!("Unexpected token {tree:?}"),
+                        }
+                    }
                     tok => panic!("Unexpected token {tok:?}"),
                 }
             }
