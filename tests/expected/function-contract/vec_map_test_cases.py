@@ -29,7 +29,7 @@ TEST_CASES = [
     TestCase(mvm("new"), ch("new_1")),
     TestCase(mvm("new", key_t = "u64", val_t = "std::option::Option<i32>"), ch("new_2")),
     TestCase(mvm("with_capacity"), ch("with_capacity")),
-    TestCase(mvm("clear"), ch("clear"), skip="it times out"),
+    TestCase(mvm("clear"), ch("clear")),
     TestCase(mvm("get", method_types=[DEFAULT_KEY_TYPE]), ch("get")),
     TestCase(mvm("get_mut", method_types=[DEFAULT_KEY_TYPE]), ch("get_mut")),
     TestCase(mvm("insert"), ch("insert")),
