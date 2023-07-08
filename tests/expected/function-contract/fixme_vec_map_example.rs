@@ -54,6 +54,8 @@ impl<K, V> VecMap<K, V> {
     }
 
     #[post(result.len() == 0)]
+    // Approximating a safe bound that won't cause allocation errors
+    #[kani::requires(capacity < 1000)]
     pub fn with_capacity(capacity: usize) -> Self
     where
         K: PartialEq,
@@ -74,6 +76,8 @@ impl<K, V> VecMap<K, V> {
     }
 
     #[post(self.len() == 0)]
+    #[kani::assigns((*self).keys.buf.ptr.pointer.pointer[..], (*self).keys.buf.cap, (*self).keys.len)]
+    #[kani::assigns((*self).values.buf.ptr.pointer.pointer[..], (*self).values.buf.cap, (*self).values.len)]
     pub fn clear(&mut self) {
         self.keys.clear();
         self.values.clear();
