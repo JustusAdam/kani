@@ -43,37 +43,39 @@ TEST_FILE = "fixme_vec_map_example.rs"
 def run_tests(test_cases: abc.Iterable[TestCase], args):
     timeout = args.timeout
     for tc in test_cases:
-        if tc.skip is not None and args.index is None and not args.noskip:
-            print(f"{TC.lightblue}Skipping function contract for {tc.function}{TC.reset} because {tc.skip}")
-            continue
-
+        skip = tc.skip is not None and args.index is None and not args.noskip
         cmd = ("kani", "--default-unwind", "10", "--check-contract", f"{tc.function}/{tc.harness}", args.test_file)
-        if args.echo_commands:
+        if args.echo_commands and not skip:
             print(shlex.join(cmd))
         print(f"Checking function contract for {tc.function} on {tc.harness} ... ", end='', flush=True)
+        if skip:
+            print(f"{TC.lightblue}skipped{TC.reset} because {tc.skip}")
+            continue
         try:
             before = time.time()
             ret = run(cmd, capture_output=True, timeout=timeout, text=True)
-            if check_and_report_cmd_result(ret, args.fail_fast):
-                after = time.time()
-                print(f"{TC.green}finished successfully{TC.reset} in {round(after - before, ndigits=1)} seconds")
-            elif args.fail_fast:
+            if not check_and_report_cmd_result(ret, before, args.fail_fast or args.verbose) and args.fail_fast:
                 return
         except TimeoutExpired:
             print(f"{TC.yellow}timed out{TC.reset} after {timeout}s")
             if args.fail_fast:
                 return
 
-def check_and_report_cmd_result(result, print_output=True):
+def check_and_report_cmd_result(result, began=None, print_output=True):
+    success = True
     if result.returncode != 0:
         print(f"{TC.red}failure{TC.reset}, exited with code {result.returncode}")
-        if print_output:
-            print("------------ stdout ------------")
-            print(result.stdout)
-            print("------------ stderr ------------")
-            print(result.stderr)
-        return False
-    return True
+        success = False
+    else:
+        after = time.time()
+        t = f" in {round(after - began, ndigits=1)} seconds" if began is not None else ""
+        print(f"{TC.green}finished successfully{TC.reset}{t}")
+    if print_output:
+        print("------------ stdout ------------")
+        print(result.stdout)
+        print("------------ stderr ------------")
+        print(result.stderr)
+    return success
 
 def list_available():
     col_0_width = 1
@@ -105,6 +107,7 @@ def main():
     parser.add_argument("--noskip", action='store_true')
     parser.add_argument("--echo-commands", action='store_true')
     parser.add_argument("--test-file", default=TEST_FILE)
+    parser.add_argument("--verbose", action='store_true')
     args = parser.parse_args()
 
     if args.list:
@@ -117,10 +120,9 @@ def main():
     basedir = mypath.parent.parent.parent.parent
     scriptdir = basedir / "scripts"
 
-    build_res = run(["cargo", "build-dev"], cwd=basedir, capture_output=True)
+    build_res = run(["cargo", "build-dev"], cwd=basedir, capture_output=True, text=True)
     if not check_and_report_cmd_result(build_res):
         return
-    print(f"{TC.green}done{TC.reset}")
 
     oldpath = os.environ["PATH"]
 
