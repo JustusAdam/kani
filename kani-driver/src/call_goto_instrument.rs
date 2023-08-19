@@ -2,17 +2,17 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 use anyhow::Result;
-use std::ffi::OsString;
 use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
 use std::process::Command;
+use std::{collections::HashMap, ffi::OsString};
 
 use crate::metadata::collect_and_link_function_pointer_restrictions;
 use crate::project::Project;
 use crate::session::KaniSession;
 use crate::util::alter_extension;
-use kani_metadata::{ArtifactType, HarnessMetadata};
+use kani_metadata::{ArtifactType, HarnessMetadata, SerializableContractMetadata};
 
 impl KaniSession {
     /// Instrument and optimize a goto binary in-place.
@@ -22,6 +22,7 @@ impl KaniSession {
         output: &Path,
         project: &Project,
         harness: &HarnessMetadata,
+        contract_info: SerializableContractMetadata,
     ) -> Result<()> {
         // We actually start by calling goto-cc to start the specialization:
         self.specialize_to_proof_harness(input, output, &harness.mangled_name)?;
@@ -36,6 +37,8 @@ impl KaniSession {
         if self.args.run_sanity_checks {
             self.goto_sanity_check(output)?;
         }
+
+        self.instrument_contracts(harness, output, contract_info)?;
 
         if self.args.checks.undefined_function_on() {
             self.add_library(output)?;
@@ -156,6 +159,43 @@ impl KaniSession {
             file.to_owned().into_os_string(),
             output_file.to_owned().into_os_string(),
         ];
+
+        self.call_goto_instrument(args)
+    }
+
+    /// Make CBMC enforce a function contract.
+    pub fn instrument_contracts(
+        &self,
+        harness: &HarnessMetadata,
+        file: &Path,
+        contract_info: SerializableContractMetadata,
+    ) -> Result<()> {
+        // let demangled = pretty_name_map
+        //     .iter()
+        //     .find(|(_, pretty)| pretty.as_ref().map_or(false, |s| s == function))
+        //     .unwrap_or_else(|| panic!("Could not find function '{function}' in name map, it likely is not in the reachable code. Ensure that your harness calls the fucntion for which you would like to check the contract (including the correct type variable instantiations)."))
+        //     .0;
+
+        let check = &contract_info.check_contract;
+        let replace = &contract_info.replace_contracts;
+
+        if check.is_none() && replace.is_empty() {
+            return Ok(());
+        }
+
+        let mut args: Vec<std::ffi::OsString> =
+            vec!["--dfcc".into(), (&harness.mangled_name).into()];
+
+        if let Some(function) = check {
+            println!("enforcing function contract for {function}");
+            args.extend(["--enforce-contract".into(), function.into()]);
+        }
+
+        for repl in replace {
+            args.extend(["--replace-call-with-contract".into(), repl.into()]);
+        }
+
+        args.extend([file.into(), file.into()]);
 
         self.call_goto_instrument(args)
     }

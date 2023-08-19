@@ -6,7 +6,10 @@ use proc_macro::TokenStream;
 
 use {
     quote::{quote, ToTokens},
-    syn::{parse_macro_input, spanned::Spanned, visit::Visit, Expr, ItemFn},
+    syn::{
+        parse_macro_input, spanned::Spanned, visit::Visit, Expr, ExprCall, ExprPath, ItemFn, Path,
+        PathSegment,
+    },
 };
 
 use proc_macro2::{Ident, Span, TokenStream as TokenStream2};
@@ -29,7 +32,28 @@ fn hash_of_token_stream<H: std::hash::Hasher>(hasher: &mut H, stream: proc_macro
     }
 }
 
-use syn::visit_mut::VisitMut;
+macro_rules! assert_spanned_err {
+    ($condition:expr, $span_source:expr, $msg:expr, $($args:expr),+) => {
+        if !$condition {
+            $span_source.span().unwrap().error(format!($msg, $($args),*)).emit();
+            assert!(false);
+        }
+    };
+    ($condition:expr, $span_source:expr, $msg:expr $(,)?) => {
+        if !$condition {
+            $span_source.span().unwrap().error($msg).emit();
+            assert!(false);
+        }
+    };
+    ($condition:expr, $span_source:expr) => {
+        assert_spanned_err!($condition, $span_source, concat!("Failed assertion ", stringify!($condition)))
+    };
+}
+
+use syn::{
+    punctuated::Punctuated, token::Comma, visit_mut::VisitMut, Attribute, Block, ExprArray,
+    ExprReference, ExprStruct, ExprTuple, FieldValue, FnArg, Pat, Signature, Token,
+};
 
 /// Hash this `TokenStream` and return an integer that is at most digits
 /// long when hex formatted.
@@ -49,12 +73,155 @@ fn identifier_for_generated_function(related_function: &ItemFn, purpose: &str, h
     Ident::new(&identifier, proc_macro2::Span::mixed_site())
 }
 
+#[allow(dead_code)]
 pub fn requires(attr: TokenStream, item: TokenStream) -> TokenStream {
     requires_ensures_alt(attr, item, true)
 }
 
+#[allow(dead_code)]
 pub fn ensures(attr: TokenStream, item: TokenStream) -> TokenStream {
     requires_ensures_alt(attr, item, false)
+}
+
+#[allow(dead_code)]
+pub fn assigns(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let item = proc_macro2::TokenStream::from(item);
+    let attr = proc_macro2::TokenStream::from(attr);
+    quote!(
+        #[kanitool::assigns(#attr)]
+        #item
+    )
+    .into()
+}
+
+trait OldTrigger {
+    /// You are provided the expression that is the first argument of the
+    /// `old()` call. You may modify it as you see fit. The return value
+    /// indicates whether the entire `old()` call should be replaced by the
+    /// (potentially altered) first argument.
+    ///
+    /// The second argument is the span of the original `old` expr
+    fn trigger(&mut self, e: &mut Expr, s: Span) -> bool;
+}
+
+struct OldLifter(Vec<Expr>);
+
+impl OldLifter {
+    fn generate_identifier_for(index: usize) -> Ident {
+        let gen_ident = format!("old_{index}");
+        Ident::new(&gen_ident, proc_macro2::Span::mixed_site())
+    }
+
+    fn into_iter_exprs_and_idents(self) -> impl Iterator<Item = (Ident, Expr)> {
+        self.0
+            .into_iter()
+            .enumerate()
+            .map(|(index, e)| (OldLifter::generate_identifier_for(index), e))
+    }
+
+    fn new() -> Self {
+        Self(vec![])
+    }
+}
+
+struct OldDenier;
+
+impl OldTrigger for OldDenier {
+    fn trigger(&mut self, _: &mut Expr, s: Span) -> bool {
+        s.unwrap().error("Nested calls to `old` are prohibited, because they are not well defined (what would it even mean?)").emit();
+        false
+    }
+}
+
+struct OldVisitor<T>(T);
+
+impl<T: OldTrigger> OldVisitor<T> {
+    fn new(t: T) -> Self {
+        Self(t)
+    }
+
+    fn into_inner(self) -> T {
+        self.0
+    }
+}
+
+impl<T: OldTrigger> syn::visit_mut::VisitMut for OldVisitor<T> {
+    fn visit_expr_mut(&mut self, ex: &mut Expr) {
+        let trigger = match &*ex {
+            Expr::Call(
+                call @ ExprCall {
+                    func:
+                        box func @ Expr::Path(ExprPath {
+                            attrs: func_attrs,
+                            qself: None,
+                            path: Path { leading_colon: None, segments },
+                        }),
+                    attrs,
+                    args,
+                    ..
+                },
+            ) if segments.len() == 1
+                && segments.first().map_or(false, |sgm| sgm.ident == "old") =>
+            {
+                let first_segment = segments.first().unwrap();
+                assert_spanned_err!(first_segment.arguments.is_empty(), first_segment);
+                assert_spanned_err!(attrs.is_empty(), call);
+                assert_spanned_err!(func_attrs.is_empty(), func);
+                assert_spanned_err!(args.len() == 1, call);
+                true
+            }
+            _ => false,
+        };
+        if trigger {
+            let span = ex.span();
+            let new_expr = if let Expr::Call(ExprCall { ref mut args, .. }) = ex {
+                self.0
+                    .trigger(args.iter_mut().next().unwrap(), span)
+                    .then(|| args.pop().unwrap().into_value())
+            } else {
+                unreachable!()
+            };
+            if let Some(new) = new_expr {
+                let _ = std::mem::replace(ex, new);
+            }
+        } else {
+            syn::visit_mut::visit_expr_mut(self, ex)
+        }
+    }
+}
+
+impl OldTrigger for OldLifter {
+    fn trigger(&mut self, e: &mut Expr, _: Span) -> bool {
+        let mut denier = OldVisitor::new(OldDenier);
+        // This ensures there are no nested calls to `old`
+        denier.visit_expr_mut(e);
+
+        self.0.push(std::mem::replace(
+            e,
+            Expr::Path(ExprPath {
+                attrs: vec![],
+                qself: None,
+                path: Path {
+                    leading_colon: None,
+                    segments: [PathSegment {
+                        ident: OldLifter::generate_identifier_for(self.0.len()),
+                        arguments: syn::PathArguments::None,
+                    }]
+                    .into_iter()
+                    .collect(),
+                },
+            }),
+        ));
+        true
+    }
+}
+
+struct IdentToOldRewriter;
+
+impl syn::visit_mut::VisitMut for IdentToOldRewriter {
+    fn visit_pat_ident_mut(&mut self, i: &mut syn::PatIdent) {
+        i.ident = Ident::new(&format!("old_{}", i.ident.to_string()), i.span())
+    }
 }
 
 /// Collect all named identifiers used in the argument patterns of a function.
@@ -123,6 +290,10 @@ enum ContractFunctionState {
     /// This is a check function that was generated from a previous evaluation
     /// of a contract attribute
     Check,
+    /// This is a replace function that was generated from a previous evaluation
+    /// of a contract attribute
+    Replace,
+    ReplaceDummy,
 }
 
 impl ContractFunctionState {
@@ -136,11 +307,16 @@ impl ContractFunctionState {
                         lst.span().unwrap().error(format!("{e}")).emit();
                     }
                     Ok(ident) => {
-                        if ident.to_string() == "check" {
-                            return Some(Self::Check);
-                        } else {
-                            lst.span().unwrap().error("Expected `check` ident").emit();
-                        }
+                        let ident_str = ident.to_string();
+                        return match ident_str.as_str() {
+                            "check" => Some(Self::Check),
+                            "replace" => Some(Self::Replace),
+                            "replace_dummy" => Some(Self::ReplaceDummy),
+                            _ => {
+                                lst.span().unwrap().error("Expected `check` ident").emit();
+                                None
+                            }
+                        };
                     }
                 }
             }
@@ -151,6 +327,93 @@ impl ContractFunctionState {
             }
         }
         None
+    }
+
+    fn emit_tag_attr(self) -> bool {
+        matches!(self, ContractFunctionState::Untouched)
+    }
+
+    /// The only reason the `item_fn` is mutable is because we need to emit
+    /// attributes in a different order and so we need to temporarily move
+    /// item_fn.attrs.
+    ///
+    /// This function decides whether we will be emitting a check function, a
+    /// replace function or both and emit a header into `output` if necessary.
+    ///
+    /// The first field of the returned tuple is a name for the replace
+    /// function, the second for the check function.
+    ///
+    /// The following is going to happen depending on the state of `self`
+    ///
+    /// - On [`ContractFunctionState::Original`] we return an overall [`None`]
+    ///   indicating to short circuit the code generation.
+    /// - On [`ContractFunctionState::Replace`] and
+    ///   [`ContractFunctionState::Check`] we return [`Some`] for one of the
+    ///   tuple fields, indicating that only this type of function should be
+    ///   emitted.
+    /// - On [`ContractFunctionState::Untouched`] we return [`Some`] for both
+    ///   tuple fields, indicating that both functions need to be emitted. We
+    ///   also emit the original function with the `checked_with` and
+    ///   `replaced_with` attributes added.
+    fn prepare_header(
+        self,
+        item_fn: &mut ItemFn,
+        output: &mut TokenStream2,
+        a_short_hash: u64,
+    ) -> Option<(Option<(Ident, Option<Ident>)>, Option<Ident>)> {
+        match self {
+            ContractFunctionState::Untouched => {
+                // We are the first time a contract is handled on this function, so
+                // we're responsible for
+                //
+                // 1. Generating a name for the check function
+                // 2. Emitting the original, unchanged item and register the check
+                //    function on it via attribute
+                // 3. Renaming our item to the new name
+                // 4. And (minor point) adding #[allow(dead_code)] and
+                //    #[allow(unused_variables)] to the check function attributes
+
+                let check_fn_name =
+                    identifier_for_generated_function(item_fn, "check", a_short_hash);
+                let replace_fn_name =
+                    identifier_for_generated_function(item_fn, "replace", a_short_hash);
+                let dummy_fn_name =
+                    identifier_for_generated_function(item_fn, "replace_dummy", a_short_hash);
+
+                // Constructing string literals explicitly here, because if we call
+                // `stringify!` in the generated code that is passed on as that
+                // expression to the next expansion of a contract, not as the
+                // literal.
+                let check_fn_name_str =
+                    syn::LitStr::new(&check_fn_name.to_string(), Span::call_site());
+                let replace_fn_name_str =
+                    syn::LitStr::new(&replace_fn_name.to_string(), Span::call_site());
+                let dummy_fn_name_str =
+                    syn::LitStr::new(&dummy_fn_name.to_string(), Span::call_site());
+
+                // The order of `attrs` and `kanitool::{checked_with,
+                // is_contract_generated}` is important here, because macros are
+                // expanded outside in. This way other contract annotations in `attrs`
+                // sees those attributes and can use them to determine
+                // `function_state`.
+                //
+                // We're emitting the original here but the same applies later when we
+                // emit the check function.
+                let attrs = &mut std::mem::replace(&mut item_fn.attrs, vec![]);
+                output.extend(quote!(
+                    #(#attrs)*
+                    #[kanitool::checked_with = #check_fn_name_str]
+                    #[kanitool::replaced_with = #replace_fn_name_str]
+                    #[kanitool::memory_havoc_dummy = #dummy_fn_name_str]
+                    #item_fn
+                ));
+                std::mem::swap(&mut item_fn.attrs, attrs);
+                Some((Some((replace_fn_name, Some(dummy_fn_name))), Some(check_fn_name)))
+            }
+            ContractFunctionState::Original | Self::ReplaceDummy => None,
+            ContractFunctionState::Check => Some((None, Some(item_fn.sig.ident.clone()))),
+            ContractFunctionState::Replace => Some((Some((item_fn.sig.ident.clone(), None)), None)),
+        }
     }
 }
 
@@ -229,6 +492,214 @@ fn rename_argument_occurences(sig: &syn::Signature, attr: &mut Expr) -> HashMap<
     arg_idents
 }
 
+struct ContractConditionsHandler<'a> {
+    condition_type: ContractConditionsType,
+    attr: Expr,
+    body: Block,
+    /// An unparsed copy of the original attribute which is used for the
+    /// messages in `assert`
+    attr_copy: &'a TokenStream2,
+}
+
+enum ContractConditionsType {
+    Requires,
+    Ensures { old_vars: Vec<Ident>, old_exprs: Vec<Expr>, arg_idents: HashMap<Ident, Ident> },
+}
+
+impl ContractConditionsType {
+    fn new_ensures(sig: &Signature, attr: &mut Expr) -> Self {
+        let old_replacer = {
+            let mut vis = OldVisitor::new(OldLifter::new());
+            vis.visit_expr_mut(attr);
+            vis.into_inner()
+        };
+        let (old_vars, old_exprs): (Vec<_>, Vec<_>) =
+            old_replacer.into_iter_exprs_and_idents().unzip();
+
+        let arg_idents = rename_argument_occurences(sig, attr);
+
+        ContractConditionsType::Ensures { old_vars, old_exprs, arg_idents }
+    }
+}
+
+impl<'a> ContractConditionsHandler<'a> {
+    fn new(
+        is_requires: bool,
+        mut attr: Expr,
+        fn_sig: &Signature,
+        fn_body: Block,
+        attr_copy: &'a TokenStream2,
+    ) -> Self {
+        let condition_type = if is_requires {
+            ContractConditionsType::Requires
+        } else {
+            ContractConditionsType::new_ensures(fn_sig, &mut attr)
+        };
+
+        Self { condition_type, attr, body: fn_body, attr_copy }
+    }
+
+    fn make_check_body(&self) -> TokenStream2 {
+        let attr = &self.attr;
+        let call_to_prior = &self.body;
+        match &self.condition_type {
+            ContractConditionsType::Requires => quote!(
+                kani::assume(#attr);
+                #call_to_prior
+            ),
+            ContractConditionsType::Ensures { old_vars, old_exprs, arg_idents } => {
+                let arg_names = arg_idents.values();
+                let arg_names_2 = arg_names.clone();
+                let arg_idents = arg_idents.keys();
+                let attr = &self.attr;
+                let attr_copy = self.attr_copy;
+
+                // The code that enforces the postconditions and cleans up the shallow
+                // argument copies (with `mem::forget`).
+                let exec_postconditions = quote!(
+                    kani::assert(#attr, stringify!(#attr_copy));
+                    #(std::mem::forget(#arg_names_2);)*
+                );
+
+                // We make a copy here because we'll modify it. Technically not
+                // necessary but could lead to weird results if
+                // `make_replace_body` were called after this if we modified in
+                // place.
+                let mut call = call_to_prior.clone();
+
+                let mut inject_conditions = PostconditionInjector(exec_postconditions.clone());
+                inject_conditions.visit_block_mut(&mut call);
+                quote!(
+                    #(let #old_vars = #old_exprs;)*
+                    #(let #arg_names = kani::untracked_deref(&#arg_idents);)*
+                    let result = #call;
+                    #exec_postconditions
+                    result
+                )
+            }
+        }
+    }
+
+    fn make_replace_body(&self, sig: &Signature, use_dummy_fn_call: Option<Ident>) -> TokenStream2 {
+        let attr = &self.attr;
+        let attr_copy = self.attr_copy;
+        let call_to_prior = if let Some(dummy) = use_dummy_fn_call {
+            let arg_exprs = sig.inputs.iter().map(|arg| match arg {
+                FnArg::Receiver(_) => Expr::Verbatim(quote!(self)),
+                FnArg::Typed(typed) => pat_to_expr(&typed.pat),
+            });
+            let mut self_detector = SelfDetector(false);
+            self_detector.visit_signature(sig);
+            if self_detector.0 {
+                quote!(
+                    Self::#dummy(#(#arg_exprs),*)
+                )
+            } else {
+                quote!(
+                    #dummy(#(#arg_exprs),*)
+                )
+            }
+        } else {
+            self.body.to_token_stream()
+        };
+        match &self.condition_type {
+            ContractConditionsType::Requires => quote!(
+                kani::assert(#attr, stringify!(#attr_copy));
+                #call_to_prior
+            ),
+            ContractConditionsType::Ensures { old_vars, old_exprs, arg_idents } => {
+                let arg_names = arg_idents.values();
+                let arg_values = arg_idents.keys();
+                quote!(
+                    #(let #old_vars = #old_exprs;)*
+                    #(let #arg_names = kani::untracked_deref(&#arg_values);)*
+                    let result = #call_to_prior;
+                    kani::assume(#attr);
+                    result
+                )
+            }
+        }
+    }
+}
+
+struct SelfDetector(bool);
+
+impl<'ast> Visit<'ast> for SelfDetector {
+    fn visit_path(&mut self, i: &'ast syn::Path) {
+        self.0 |= i.get_ident().map_or(false, |i| i == "self")
+            || i.get_ident().map_or(false, |i| i == "Self")
+    }
+}
+
+fn pat_to_expr(pat: &Pat) -> Expr {
+    let mk_err = |typ| {
+        pat.span()
+            .unwrap()
+            .error(format!("`{typ}` patterns are not supported for functions with contracts"))
+            .emit();
+        unreachable!()
+    };
+    match pat {
+        Pat::Const(c) => Expr::Const(c.clone()),
+        Pat::Ident(id) => Expr::Verbatim(id.ident.to_token_stream()),
+        Pat::Lit(lit) => Expr::Lit(lit.clone()),
+        Pat::Reference(rf) => Expr::Reference(ExprReference {
+            attrs: vec![],
+            and_token: rf.and_token,
+            mutability: rf.mutability,
+            expr: Box::new(pat_to_expr(&rf.pat)),
+        }),
+        Pat::Tuple(tup) => Expr::Tuple(ExprTuple {
+            attrs: vec![],
+            paren_token: tup.paren_token,
+            elems: tup.elems.iter().map(pat_to_expr).collect(),
+        }),
+        Pat::Slice(slice) => Expr::Reference(ExprReference {
+            attrs: vec![],
+            and_token: Token!(&)(Span::call_site()),
+            mutability: None,
+            expr: Box::new(Expr::Array(ExprArray {
+                attrs: vec![],
+                bracket_token: slice.bracket_token,
+                elems: slice.elems.iter().map(pat_to_expr).collect(),
+            })),
+        }),
+        Pat::Path(pth) => Expr::Path(pth.clone()),
+        Pat::Or(_) => mk_err("or"),
+        Pat::Rest(_) => mk_err("rest"),
+        Pat::Wild(_) => mk_err("wildcard"),
+        Pat::Paren(inner) => pat_to_expr(&inner.pat),
+        Pat::Range(_) => mk_err("range"),
+        Pat::Struct(strct) => {
+            if strct.rest.is_some() {
+                mk_err("..");
+            }
+            Expr::Struct(ExprStruct {
+                attrs: vec![],
+                path: strct.path.clone(),
+                brace_token: strct.brace_token,
+                dot2_token: None,
+                rest: None,
+                qself: strct.qself.clone(),
+                fields: strct
+                    .fields
+                    .iter()
+                    .map(|field_pat| FieldValue {
+                        attrs: vec![],
+                        member: field_pat.member.clone(),
+                        colon_token: field_pat.colon_token,
+                        expr: pat_to_expr(&field_pat.pat),
+                    })
+                    .collect(),
+            })
+        }
+        Pat::Verbatim(_) => mk_err("verbatim"),
+        Pat::Type(_) => mk_err("type"),
+        Pat::TupleStruct(_) => mk_err("tuple struct"),
+        _ => mk_err("unknown"),
+    }
+}
+
 /// The main meat of handling requires/ensures contracts.
 ///
 /// Generates a `check_<fn_name>_<fn_hash>` function that assumes preconditions
@@ -284,12 +755,12 @@ fn rename_argument_occurences(sig: &syn::Signature, attr: &mut Expr) -> HashMap<
 /// ```
 fn requires_ensures_alt(attr: TokenStream, item: TokenStream, is_requires: bool) -> TokenStream {
     let attr_copy = proc_macro2::TokenStream::from(attr.clone());
-    let mut attr = parse_macro_input!(attr as Expr);
+    let attr = parse_macro_input!(attr as Expr);
 
     let mut output = proc_macro2::TokenStream::new();
 
     let a_short_hash = short_hash_of_token_stream(&item);
-    let item_fn = &mut parse_macro_input!(item as ItemFn);
+    let mut item_fn = parse_macro_input!(item as ItemFn);
 
     // If we didn't find any other contract handling related attributes we
     // assume this function has not been touched by a contract before.
@@ -299,107 +770,68 @@ fn requires_ensures_alt(attr: TokenStream, item: TokenStream, is_requires: bool)
         .find_map(ContractFunctionState::from_attribute)
         .unwrap_or(ContractFunctionState::Untouched);
 
-    if matches!(function_state, ContractFunctionState::Original) {
+    let Some((emit_replace, emit_check)) =
+        function_state.prepare_header(&mut item_fn, &mut output, a_short_hash)
+    else {
         // If we're the original function that means we're *not* the first time
         // that a contract attribute is handled on this function. This means
         // there must exist a generated check function somewhere onto which the
         // attributes have been copied and where they will be expanded into more
         // checks. So we just return outselves unchanged.
         return item_fn.into_token_stream().into();
-    }
-
-    let attrs = std::mem::replace(&mut item_fn.attrs, vec![]);
-
-    if matches!(function_state, ContractFunctionState::Untouched) {
-        // We are the first time a contract is handled on this function, so
-        // we're responsible for
-        //
-        // 1. Generating a name for the check function
-        // 2. Emitting the original, unchanged item and register the check
-        //    function on it via attribute
-        // 3. Renaming our item to the new name
-        // 4. And (minor point) adding #[allow(dead_code)] and
-        //    #[allow(unused_variables)] to the check function attributes
-
-        let check_fn_name = identifier_for_generated_function(item_fn, "check", a_short_hash);
-
-        // Constructing string literals explicitly here, because if we call
-        // `stringify!` in the generated code that is passed on as that
-        // expression to the next expansion of a contract, not as the
-        // literal.
-        let check_fn_name_str = syn::LitStr::new(&check_fn_name.to_string(), Span::call_site());
-
-        // The order of `attrs` and `kanitool::{checked_with,
-        // is_contract_generated}` is important here, because macros are
-        // expanded outside in. This way other contract annotations in `attrs`
-        // sees those attribuites and can use them to determine
-        // `function_state`.
-        //
-        // We're emitting the original here but the same applies later when we
-        // emit the check function.
-        output.extend(quote!(
-            #(#attrs)*
-            #[kanitool::checked_with = #check_fn_name_str]
-            #item_fn
-
-            #[allow(dead_code)]
-            #[allow(unused_variables)]
-        ));
-        item_fn.sig.ident = check_fn_name;
-    }
-
-    let call_to_prior = &mut item_fn.block;
-
-    let check_body = if is_requires {
-        quote!(
-            kani::assume(#attr);
-            #call_to_prior
-        )
-    } else {
-        let arg_idents = rename_argument_occurences(&item_fn.sig, &mut attr);
-
-        let arg_copy_names = arg_idents.values();
-        let also_arg_copy_names = arg_copy_names.clone();
-        let arg_idents = arg_idents.keys();
-
-        // The code that enforces the postconditions and cleans up the shallow
-        // argument copies (with `mem::forget`).
-        let exec_postconditions = quote!(
-            kani::assert(#attr, stringify!(#attr_copy));
-            #(std::mem::forget(#also_arg_copy_names);)*
-        );
-
-        let mut inject_conditions = PostconditionInjector(exec_postconditions.clone());
-        inject_conditions.visit_block_mut(&mut *call_to_prior);
-
-        quote!(
-            #(let #arg_copy_names = kani::untracked_deref(&#arg_idents);)*
-            let result = #call_to_prior;
-            #exec_postconditions
-            result
-        )
     };
 
-    let sig = &item_fn.sig;
+    let ItemFn { attrs, vis: _, mut sig, block } = item_fn;
 
-    // Prepare emitting the check function by emitting the rest of the
-    // attributes.
-    output.extend(quote!(
-        #(#attrs)*
-    ));
+    let handler = ContractConditionsHandler::new(is_requires, attr, &sig, *block, &attr_copy);
 
-    if matches!(function_state, ContractFunctionState::Untouched) {
-        // If it's the first time we also emit this marker. Again, order is
-        // important so this happens as the last emitted attribute.
-        output.extend(quote!(#[kanitool::is_contract_generated(check)]));
+    let emit_common_header = |output: &mut TokenStream2| {
+        if function_state.emit_tag_attr() {
+            output.extend(quote!(
+                #[allow(dead_code, unused_variables)]
+            ));
+        }
+        output.extend(attrs.iter().flat_map(Attribute::to_token_stream));
+    };
+
+    if let Some((replace_name, dummy)) = emit_replace {
+        emit_common_header(&mut output);
+
+        if function_state.emit_tag_attr() {
+            // If it's the first time we also emit this marker. Again, order is
+            // important so this happens as the last emitted attribute.
+            output.extend(quote!(#[kanitool::is_contract_generated(replace)]));
+        }
+
+        let body = handler.make_replace_body(&sig, dummy);
+
+        sig.ident = replace_name;
+
+        // Finally emit the check function itself.
+        output.extend(quote!(
+            #sig {
+                #body
+            }
+        ));
     }
 
-    // Finally emit the check function itself.
-    output.extend(quote!(
-        #sig {
-            #check_body
+    if let Some(check_name) = emit_check {
+        emit_common_header(&mut output);
+
+        if function_state.emit_tag_attr() {
+            // If it's the first time we also emit this marker. Again, order is
+            // important so this happens as the last emitted attribute.
+            output.extend(quote!(#[kanitool::is_contract_generated(check)]));
         }
-    ));
+        let body = handler.make_check_body();
+        sig.ident = check_name;
+        output.extend(quote!(
+            #sig {
+                #body
+            }
+        ))
+    }
+
     output.into()
 }
 

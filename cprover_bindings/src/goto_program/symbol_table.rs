@@ -1,7 +1,7 @@
 // Copyright Kani Contributors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 use super::super::{env, MachineModel};
-use super::{BuiltinFn, Stmt, Symbol};
+use super::{BuiltinFn, FunctionContract, Stmt, Symbol};
 use crate::InternedString;
 use std::collections::BTreeMap;
 /// This is a typesafe implementation of the CBMC symbol table, based on the CBMC code at:
@@ -44,6 +44,11 @@ impl SymbolTable {
         self.lookup(name).unwrap()
     }
 
+    pub fn delete<T: Into<InternedString>>(&mut self, name: T) -> Symbol {
+        let name = name.into();
+        self.symbol_table.remove(&name).expect("Cannot delete undefined symbol")
+    }
+
     /// Insert the element into the table. Errors if element already exists.
     pub fn insert(&mut self, symbol: Symbol) {
         assert!(
@@ -78,6 +83,15 @@ impl SymbolTable {
     ) {
         let name = name.into();
         self.symbol_table.get_mut(&name).unwrap().update_fn_declaration_with_definition(body);
+    }
+
+    pub fn attach_contract<T: Into<InternedString>>(
+        &mut self,
+        name: T,
+        contract: FunctionContract,
+    ) {
+        let sym = self.symbol_table.get_mut(&name.into()).unwrap();
+        sym.attach_contract(contract);
     }
 }
 

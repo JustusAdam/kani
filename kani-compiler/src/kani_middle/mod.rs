@@ -35,6 +35,7 @@ pub mod provide;
 pub mod reachability;
 pub mod resolve;
 pub mod stubbing;
+pub mod contracts;
 
 /// Check that all crate items are supported and there's no misconfiguration.
 /// This method will exhaustively print any error / warning and it will abort at the end if any

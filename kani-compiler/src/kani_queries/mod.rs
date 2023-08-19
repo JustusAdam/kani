@@ -36,6 +36,7 @@ pub struct QueryDb {
     pub write_json_symtab: bool,
     pub reachability_analysis: ReachabilityType,
     pub stubbing_enabled: bool,
+    pub function_contracts_enabled: bool,
     pub unstable_features: Vec<String>,
 
     /// Information about all target harnesses.

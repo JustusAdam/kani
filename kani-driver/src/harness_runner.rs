@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 use anyhow::{bail, Result};
-use kani_metadata::{ArtifactType, HarnessMetadata};
+use kani_metadata::{ArtifactType, HarnessMetadata, SerializableContractMetadata};
 use rayon::prelude::*;
 use std::cmp::Ordering;
 use std::path::Path;
@@ -36,7 +36,7 @@ impl<'sess, 'pr> HarnessRunner<'sess, 'pr> {
     /// the proof-checking process for each harness in `harnesses`.
     pub(crate) fn check_all_harnesses(
         &self,
-        harnesses: &'pr [&HarnessMetadata],
+        harnesses: &[&'pr HarnessMetadata],
     ) -> Result<Vec<HarnessResult<'pr>>> {
         let sorted_harnesses = crate::metadata::sort_harnesses_by_loc(harnesses);
 
@@ -56,19 +56,38 @@ impl<'sess, 'pr> HarnessRunner<'sess, 'pr> {
                     let report_dir = self.project.outdir.join(format!("report-{harness_filename}"));
                     let goto_file =
                         self.project.get_harness_artifact(&harness, ArtifactType::Goto).unwrap();
-                    self.sess.instrument_model(goto_file, goto_file, &self.project, &harness)?;
+                    let contract_info = self.get_contract_info(harness)?;
+
+                    self.sess.instrument_model(
+                        goto_file,
+                        goto_file,
+                        &self.project,
+                        &harness,
+                        contract_info,
+                    )?;
 
                     if self.sess.args.synthesize_loop_contracts {
                         self.sess.synthesize_loop_contracts(goto_file, &goto_file, &harness)?;
                     }
 
-                    let result = self.sess.check_harness(goto_file, &report_dir, harness)?;
+                    let result = self.sess.check_harness(goto_file, &report_dir, &harness)?;
                     Ok(HarnessResult { harness, result })
                 })
                 .collect::<Result<Vec<_>>>()
         })?;
 
         Ok(results)
+    }
+
+    fn get_contract_info(
+        &self,
+        harness: &'pr HarnessMetadata,
+    ) -> Result<SerializableContractMetadata> {
+        let contract_info_artifact =
+            self.project.get_harness_artifact(&harness, ArtifactType::ContractMetadata).unwrap();
+
+        let reader = std::io::BufReader::new(std::fs::File::open(contract_info_artifact)?);
+        Ok(serde_json::from_reader(reader)?)
     }
 }
 

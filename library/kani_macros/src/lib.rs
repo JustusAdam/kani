@@ -7,7 +7,7 @@
 // downstream crates to enable these features as well.
 // So we have to enable this on the commandline (see kani-rustc) with:
 //   RUSTFLAGS="-Zcrate-attr=feature(register_tool) -Zcrate-attr=register_tool(kanitool)"
-#![feature(proc_macro_diagnostic)]
+#![feature(proc_macro_diagnostic, box_patterns)]
 
 mod derive;
 
@@ -97,7 +97,7 @@ pub fn derive_arbitrary(item: TokenStream) -> TokenStream {
     derive::expand_derive_arbitrary(item)
 }
 
-///  Add a precondition to this function.
+/// Add a precondition to this function.
 ///
 /// This is part of the function contract API, together with [`ensures`].
 ///
@@ -136,6 +136,11 @@ pub fn requires(attr: TokenStream, item: TokenStream) -> TokenStream {
 #[proc_macro_attribute]
 pub fn ensures(attr: TokenStream, item: TokenStream) -> TokenStream {
     attr_impl::ensures(attr, item)
+}
+
+#[proc_macro_attribute]
+pub fn assigns(attr: TokenStream, item: TokenStream) -> TokenStream {
+    attr_impl::assigns(attr, item)
 }
 
 /// Designates this function as a harness to check a function contract.
@@ -343,5 +348,7 @@ mod regular {
     no_op!(unwind);
     no_op!(requires);
     no_op!(ensures);
+    no_op!(assigns);
     no_op!(proof_for_contract);
+    no_op!(stub_verified);
 }

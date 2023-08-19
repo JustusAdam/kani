@@ -5,6 +5,20 @@ use crate::CbmcSolver;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ContractMetadata<Check, Replace> {
+    pub check_contract: Option<Check>,
+    pub replace_contracts: Replace,
+}
+
+impl<Check, Replace: Default> Default for ContractMetadata<Check, Replace> {
+    fn default() -> Self {
+        ContractMetadata { check_contract: None, replace_contracts: Default::default() }
+    }
+}
+
+pub type SerializableContractMetadata = ContractMetadata<String, Vec<String>>;
+
 /// We emit this structure for each annotated proof harness (`#[kani::proof]`) we find.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct HarnessMetadata {

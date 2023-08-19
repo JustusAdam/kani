@@ -5,13 +5,23 @@
 use std::collections::BTreeMap;
 
 use kani_metadata::{CbmcSolver, HarnessAttributes, Stub};
+use rustc_abi::FIRST_VARIANT;
 use rustc_ast::{
-    attr, AttrArgs, AttrArgsEq, AttrKind, Attribute, ExprKind, LitKind, MetaItem, MetaItemKind,
+    attr,
+    token::{BinOpToken, Delimiter, Token, TokenKind},
+    tokenstream::{TokenStream, TokenTree},
+    AttrArgs, AttrArgsEq, AttrKind, Attribute, ExprKind, LitKind, MetaItem, MetaItemKind,
     NestedMetaItem,
 };
 use rustc_errors::ErrorGuaranteed;
-use rustc_hir::{def::DefKind, def_id::DefId};
-use rustc_middle::ty::{Instance, TyCtxt, TyKind};
+use rustc_hir::{
+    def::DefKind,
+    def_id::{DefId, LocalDefId},
+};
+use rustc_middle::{
+    mir::{Place, PlaceElem, ProjectionElem},
+    ty::{Instance, TyCtxt, TyKind},
+};
 use rustc_session::Session;
 use rustc_span::{Span, Symbol};
 use std::str::FromStr;
@@ -19,7 +29,7 @@ use strum_macros::{AsRefStr, EnumString};
 
 use tracing::{debug, trace};
 
-use super::resolve::{self, resolve_fn};
+use super::resolve::{self, resolve_fn, ResolveError};
 
 #[derive(Debug, Clone, Copy, AsRefStr, EnumString, PartialEq, Eq, PartialOrd, Ord)]
 #[strum(serialize_all = "snake_case")]
@@ -31,6 +41,8 @@ enum KaniAttributeKind {
     /// Attribute used to mark unstable APIs.
     Unstable,
     Unwind,
+    Assigns,
+    StubVerified,
     /// A harness, similar to [`Self::Proof`], but for checking a function
     /// contract, e.g. the contract check is substituted for the target function
     /// before the the verification runs.
@@ -38,6 +50,8 @@ enum KaniAttributeKind {
     /// Attribute on a function with a contract that identifies the code
     /// implementing the check for this contract.
     CheckedWith,
+    ReplacedWith,
+    MemoryHavocDummy,
     /// Attribute on a function that was auto-generated from expanding a
     /// function contract.
     IsContractGenerated,
@@ -52,9 +66,13 @@ impl KaniAttributeKind {
             | KaniAttributeKind::Solver
             | KaniAttributeKind::Stub
             | KaniAttributeKind::ProofForContract
+            | KaniAttributeKind::StubVerified
             | KaniAttributeKind::Unwind => true,
             KaniAttributeKind::Unstable
+            | KaniAttributeKind::Assigns
+            | KaniAttributeKind::ReplacedWith
             | KaniAttributeKind::CheckedWith
+            | KaniAttributeKind::MemoryHavocDummy
             | KaniAttributeKind::IsContractGenerated => false,
         }
     }
@@ -71,7 +89,7 @@ impl KaniAttributeKind {
     /// contract. E.g. created by `requires`, `ensures`
     pub fn is_function_contract(self) -> bool {
         use KaniAttributeKind::*;
-        matches!(self, CheckedWith | IsContractGenerated)
+        matches!(self, CheckedWith | ReplacedWith | IsContractGenerated)
     }
 }
 
@@ -134,14 +152,10 @@ impl<'tcx> KaniAttributes<'tcx> {
     /// Parse and extract the `proof_for_contract(TARGET)` attribute. The
     /// returned symbol and defid are respectively the name and id of `TARGET`,
     /// the span in the span for the attribute (contents).
-    fn interpret_the_for_contract_attribute(&self) -> Option<(Symbol, DefId, Span)> {
+    pub fn interpret_the_for_contract_attribute(&self) -> Option<(Symbol, DefId, Span)> {
         self.expect_maybe_one(KaniAttributeKind::ProofForContract).and_then(|target| {
             let name = expect_key_string_value(self.tcx.sess, target);
-            let resolved = resolve_fn(
-                self.tcx,
-                self.tcx.parent_module_from_def_id(self.item.expect_local()),
-                name.as_str(),
-            );
+            let resolved = self.resolve_from_self(name.as_str());
             match resolved {
                 Err(e) => {
                     self.tcx.sess.span_err(
@@ -158,11 +172,51 @@ impl<'tcx> KaniAttributes<'tcx> {
         })
     }
 
+    pub fn use_contract(&self) -> Vec<(Symbol, DefId, Span)> {
+        self.map.get(&KaniAttributeKind::StubVerified).map_or_else(Vec::new, |attr| {
+            attr.iter()
+                .filter_map(|attr| {
+                    let name = expect_key_string_value(self.tcx.sess, attr);
+                    let resolved = self.resolve_from_self(name.as_str());
+                    match resolved {
+                        Err(e) => {
+                            self.tcx.sess.span_err(
+                                attr.span,
+                                format!(
+                                    "Sould not resolve replacement function {} because {e}",
+                                    name.as_str()
+                                ),
+                            );
+                            None
+                        }
+                        Ok(ok) => Some((name, ok, attr.span)),
+                    }
+                })
+                .collect()
+        })
+    }
+
     /// Extact the name of the sibling function this contract is checked with
     /// (if any)
     pub fn checked_with(&self) -> Option<Symbol> {
         self.expect_maybe_one(KaniAttributeKind::CheckedWith)
             .map(|target| expect_key_string_value(self.tcx.sess, target))
+    }
+
+    pub fn replaced_with(&self) -> Option<Symbol> {
+        self.expect_maybe_one(KaniAttributeKind::ReplacedWith)
+            .map(|target| expect_key_string_value(self.tcx.sess, target))
+    }
+
+    pub fn memory_havoc_dummy(&self) -> Option<DefId> {
+        let target = self
+            .expect_maybe_one(KaniAttributeKind::MemoryHavocDummy)
+            .map(|target| expect_key_string_value(self.tcx.sess, target))?;
+        Some(self.resolve_from_self(target.as_str()).unwrap())
+    }
+
+    fn resolve_from_self(&self, path_str: &str) -> Result<DefId, ResolveError<'tcx>> {
+        resolve_fn(self.tcx, self.tcx.parent_module_from_def_id(self.item.expect_local()), path_str)
     }
 
     /// Check that all attributes assigned to an item is valid.
@@ -215,7 +269,10 @@ impl<'tcx> KaniAttributes<'tcx> {
                     assert!(!self.map.contains_key(&KaniAttributeKind::Proof));
                     expect_single(self.tcx, kind, &attrs);
                 }
-                KaniAttributeKind::CheckedWith => {
+                KaniAttributeKind::StubVerified => {}
+                KaniAttributeKind::CheckedWith
+                | KaniAttributeKind::ReplacedWith
+                | KaniAttributeKind::MemoryHavocDummy => {
                     self.expect_maybe_one(kind)
                         .map(|attr| expect_key_string_value(&self.tcx.sess, attr));
                 }
@@ -223,6 +280,9 @@ impl<'tcx> KaniAttributes<'tcx> {
                     // Ignored here because this is only used by the proc macros
                     // to communicate with one another. So by the time it gets
                     // here we don't care if it's valid or not.
+                }
+                KaniAttributeKind::Assigns => {
+                    self.assigns_contract();
                 }
             }
         }
@@ -240,14 +300,9 @@ impl<'tcx> KaniAttributes<'tcx> {
         }
 
         // If the `function-contracts` unstable feature is not enabled then no
-        // function should use any of those APIs. 
+        // function should use any of those APIs.
         if !enabled_features.iter().any(|feature| feature == "function-contracts") {
-            for kind in self
-                .map
-                .keys()
-                .copied()
-                .filter(|a| a.is_function_contract_api())
-            {
+            for kind in self.map.keys().copied().filter(|a| a.is_function_contract_api()) {
                 let msg = format!(
                     "Using the {} attribute requires activating the unstable `function-contracts` feature",
                     kind.as_ref()
@@ -330,9 +385,14 @@ impl<'tcx> KaniAttributes<'tcx> {
                         // Internal attribute which shouldn't exist here.
                         unreachable!()
                     }
-                    KaniAttributeKind::CheckedWith | KaniAttributeKind::IsContractGenerated => {
+                    KaniAttributeKind::CheckedWith
+                    | KaniAttributeKind::IsContractGenerated
+                    | KaniAttributeKind::Assigns
+                    | KaniAttributeKind::MemoryHavocDummy
+                    | KaniAttributeKind::ReplacedWith => {
                         todo!("Contract attributes are not supported on proofs")
                     }
+                    KaniAttributeKind::StubVerified => {}
                 };
                 harness
             },
@@ -349,6 +409,17 @@ impl<'tcx> KaniAttributes<'tcx> {
                     }
                     Some((name, replacement_name?))
                 })
+                .into_iter()
+                .chain(self.use_contract().into_iter().filter_map(|(name, id, span)| {
+                    let replacement_name = KaniAttributes::for_item(self.tcx, id).replaced_with();
+                    if replacement_name.is_none() {
+                        self.tcx.sess.span_err(
+                            span,
+                            "The target item of this verified stubbing has no contract",
+                        );
+                    }
+                    Some((name, replacement_name?))
+                }))
                 .map(|(original, replacement)| {
                     let replace_str = replacement.as_str();
                     let original_str = original.as_str();
@@ -378,6 +449,20 @@ impl<'tcx> KaniAttributes<'tcx> {
                 tcx.sess.span_err(span, "functions used as harnesses cannot have any arguments");
             }
         }
+    }
+
+    pub fn assigns_contract(&self) -> Option<Vec<Place<'tcx>>> {
+        let local_def_id = self.item.expect_local();
+        self.map.get(&KaniAttributeKind::Assigns).map(|attr| {
+            attr.iter()
+                .flat_map(|clause| match &clause.get_normal_item().args {
+                    AttrArgs::Delimited(lvals) => {
+                        parse_assign_values(self.tcx, local_def_id, &lvals.tokens)
+                    }
+                    _ => unreachable!(),
+                })
+                .collect()
+        })
     }
 }
 
@@ -417,6 +502,168 @@ pub fn test_harness_name(tcx: TyCtxt, def_id: DefId) -> String {
     let attrs = tcx.get_attrs_unchecked(def_id);
     let marker = attr::find_by_name(attrs, rustc_span::symbol::sym::rustc_test_marker).unwrap();
     parse_str_value(&marker).unwrap()
+}
+
+pub fn wildcard_subslice<'tcx>() -> PlaceElem<'tcx> {
+    ProjectionElem::Subslice { from: u64::MAX, to: u64::MAX, from_end: false }
+}
+
+/// Parse a place (base variable with a serias of projections) from an iterator
+/// over a tokens.
+///
+/// Terminates when the iterator is empty *or* a `,` token is encoutered.
+/// Guarantees to leave the iterator either empty *or* at the token directly
+/// after `,`.
+///
+/// Returns `None` if no tokens are encoutered before iterator end or the `,`
+/// token or if there were errors, which are emitted with `tcx.sess`
+fn parse_place<'tcx, 'b, I: Iterator<Item = &'b TokenTree>>(
+    tcx: TyCtxt<'tcx>,
+    local_def_id: LocalDefId,
+    t: &mut I,
+) -> Option<Place<'tcx>> {
+    let mir = tcx.optimized_mir(local_def_id);
+    macro_rules! comma_tok {
+        () => {
+            TokenTree::Token(Token { kind: TokenKind::Comma, .. }, _)
+        };
+    }
+    let local_decls = &mir.local_decls;
+    // Skips the iterator forward until either it is empty or a `,` token is encountered
+    let skip = |t: &mut I| {
+        let _ = t.by_ref().skip_while(|t| matches!(t, comma_tok!())).count();
+    };
+    if let Some(tree) = t.next() {
+        let barks_up_the_wrong_tree = || {
+            tcx.sess.span_fatal(
+                tree.span(),
+                "Parse error in assigns clause, expected `*`, identifier or parentheses",
+            )
+        };
+        let mut base: Place<'tcx> = match tree {
+            TokenTree::Delimited(_, Delimiter::Parenthesis, inner) => {
+                let mut it = inner.trees();
+                let Some(res) = parse_place(tcx, local_def_id, &mut it) else {
+                    tcx.sess.span_err(tree.span(), "Expected an lvalue in the parantheses");
+                    return None;
+                };
+                if !it.next().is_none() {
+                    tcx.sess.span_err(
+                        tree.span(),
+                        "Expected only one lvalue in parenthesized expression",
+                    );
+                }
+                res
+            }
+            TokenTree::Token(token, _) => match &token.kind {
+                TokenKind::Ident(id, _) => {
+                    let hir = tcx.hir();
+                    let bid = hir.body_owned_by(local_def_id);
+                    let local = hir
+                        .body_param_names(bid)
+                        .zip(mir.args_iter())
+                        .find(|(name, _decl)| name.name == *id)
+                        .unwrap()
+                        .1;
+                    Place::from(local)
+                }
+                TokenKind::BinOp(BinOpToken::Star) => {
+                    let Some(res) = parse_place(tcx, local_def_id, t)
+                        .map(|p| p.project_deeper(&[ProjectionElem::Deref], tcx))
+                    else {
+                        tcx.sess.span_err(
+                            tree.span(),
+                            "Expected this dereference to be followed by an lvalue",
+                        );
+                        skip(t);
+                        return None;
+                    };
+                    res
+                }
+                _ => barks_up_the_wrong_tree(),
+            },
+            _ => barks_up_the_wrong_tree(),
+        };
+        while let Some(tree) = t.next() {
+            match tree {
+                comma_tok!() => break,
+                TokenTree::Token(token, _) => match &token.kind {
+                    TokenKind::Dot => match t.next() {
+                        Some(
+                            tok @ TokenTree::Token(
+                                Token { kind: TokenKind::Ident(field, _), .. },
+                                _,
+                            ),
+                        ) => {
+                            let pty = base.ty(local_decls, tcx);
+                            let (adt_def, _) = match pty.ty.kind() {
+                                TyKind::Adt(adt, substs) => (adt, substs),
+                                _ => panic!(),
+                            };
+                            let variant_index = pty.variant_index.unwrap_or_else(|| {
+                                assert!(adt_def.is_struct());
+                                FIRST_VARIANT
+                            });
+                            let fidx = adt_def
+                                .variant(variant_index)
+                                .fields
+                                .iter_enumerated()
+                                .find(|(_idx, fdef)| fdef.name == *field)
+                                .unwrap_or_else(|| {
+                                    tcx.sess.span_fatal(
+                                        tok.span(),
+                                        format!(
+                                            "Could not find field {field} in type {:?}",
+                                            pty.ty
+                                        ),
+                                    )
+                                })
+                                .0;
+                            let more_projections =
+                                [ProjectionElem::Field(fidx, pty.field_ty(tcx, fidx))];
+                            base = base.project_deeper(&more_projections, tcx);
+                        }
+                        thing => panic!("Incomplete field expression {thing:?}"),
+                    },
+                    _ => panic!("Unexpected token {tree:?}"),
+                },
+                TokenTree::Delimited(_, Delimiter::Bracket, inner) => {
+                    match inner.trees().collect::<Vec<_>>().as_slice() {
+                        [tok @ TokenTree::Token(Token { kind: TokenKind::DotDot, .. }, _)] => {
+                            if !matches!(t.next(), None | Some(comma_tok!())) {
+                                tcx.sess.span_err(
+                                    tok.span(),
+                                    "Wildcard slice pattern is only supported as last projection",
+                                );
+                            }
+                            return Some(base.project_deeper(&[wildcard_subslice()], tcx));
+                        }
+                        _ => tcx.sess.span_fatal(
+                            tree.span(),
+                            "Unexpected token, expected slice pattern `..`",
+                        ),
+                    }
+                }
+                tok => tcx.sess.span_fatal(
+                    tok.span(),
+                    "Unexpected token, expected field projection, slice pattern or comma",
+                ),
+            }
+        }
+        Some(base)
+    } else {
+        panic!()
+    }
+}
+
+fn parse_assign_values<'tcx: 'a, 'a>(
+    tcx: TyCtxt<'tcx>,
+    local_def_id: LocalDefId,
+    t: &'a TokenStream,
+) -> impl Iterator<Item = Place<'tcx>> + 'a {
+    let mut it = t.trees().peekable();
+    std::iter::from_fn(move || it.peek().is_some().then(|| parse_place(tcx, local_def_id, &mut it)))
+        .filter_map(std::convert::identity)
 }
 
 /// Expect the contents of this attribute to be of the format #[attribute =
@@ -672,7 +919,7 @@ fn parse_paths(attr: &Attribute) -> Result<Vec<String>, Span> {
         .iter()
         .map(|arg| match arg {
             NestedMetaItem::Lit(item) => Err(item.span),
-            NestedMetaItem::MetaItem(item) => parse_path(item).ok_or(item.span),
+            NestedMetaItem::MetaItem(item) => parse_path(&item).ok_or(item.span),
         })
         .collect()
 }

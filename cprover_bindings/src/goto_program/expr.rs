@@ -168,6 +168,37 @@ pub enum ExprValue {
     Vector {
         elems: Vec<Expr>,
     },
+    Quantify {
+        quantifier: Quantifier,
+        parameter: Parameter,
+        body: Expr,
+    },
+    Old(Expr),
+    /// A special expression type used in `assigns` contract clauses. See
+    /// <https://diffblue.github.io/cbmc/contracts-assigns.html>
+    ConditionalTargetGroup {
+        condition: Box<Expr>,
+        targets: Vec<MemoryTarget>,
+    },
+    MemoryTarget(MemoryTarget),
+}
+
+#[derive(Clone, Debug, Copy, Eq, PartialEq, PartialOrd)]
+pub enum Quantifier {
+    Forall,
+    Exists,
+}
+
+/// A target of an assigns clause. Used in [`ExprValue::ConditonalTargetGroup`]. See
+/// also <https://diffblue.github.io/cbmc/contracts-assigns.html>
+#[derive(Debug, Clone)]
+pub enum MemoryTarget {
+    /// lvalue-expr
+    Lvalue(Expr),
+    // | __CPROVER_typed_target(lvalue-expr)
+    ObjectWhole(Expr),
+    // | __CPROVER_object_from(ptr-expr)
+    // | __CPROVER_object_upto(ptr-expr, uint-expr)
 }
 
 /// Binary operators. The names are the same as in the Irep representation.
@@ -557,6 +588,10 @@ impl Expr {
         expr!(Dereference(self), self.typ.base_type().unwrap().clone())
     }
 
+    pub fn old(self) -> Self {
+        expr!(Old(self), self.typ().clone())
+    }
+
     /// `1.0`
     pub fn double_constant(c: f64) -> Self {
         expr!(DoubleConstant(c), Type::double())
@@ -699,7 +734,11 @@ impl Expr {
     /// `({ op1; op2; ...})`
     pub fn statement_expression(ops: Vec<Stmt>, typ: Type) -> Self {
         assert!(!ops.is_empty());
-        assert_eq!(ops.last().unwrap().get_expression().unwrap().typ, typ);
+        assert_eq!(
+            ops.last().and_then(|o| o.get_expression()).map(|e| &e.typ),
+            Some(&typ),
+            "Expected type {typ:?} for last expression in {ops:?}"
+        );
         expr!(StatementExpression { statements: ops }, typ)
     }
 
@@ -901,6 +940,15 @@ impl Expr {
         assert_eq!(typ.lookup_field_type(field, symbol_table).as_ref(), Some(value.typ()));
         let typ = typ.aggr_tag().unwrap();
         expr!(Union { value, field }, typ)
+    }
+
+    /// Create a conditional target group with this expression as the condition
+    pub fn with_target_group(self, targets: Vec<MemoryTarget>) -> Self {
+        expr!(ConditionalTargetGroup { condition: Box::new(self), targets }, Type::Empty)
+    }
+
+    pub fn unconditional_target_group(target: MemoryTarget) -> Self {
+        expr!(MemoryTarget(target), Type::Empty)
     }
 }
 
@@ -1628,5 +1676,23 @@ impl Expr {
             }
         }
         exprs
+    }
+}
+
+impl Expr {
+    pub fn quantified(
+        quantifier: Quantifier,
+        typ: Type,
+        identifier: InternedString,
+        body: Expr,
+    ) -> Self {
+        expr!(
+            ExprValue::Quantify {
+                quantifier,
+                parameter: Parameter::new(Some(identifier), None, typ),
+                body
+            },
+            Type::c_bool()
+        )
     }
 }

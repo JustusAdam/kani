@@ -125,6 +125,14 @@ impl Stmt {
         &self.body
     }
 
+    pub fn body_mut(&mut self) -> &mut StmtBody {
+        &mut self.body
+    }
+
+    pub fn into_body(self) -> StmtBody {
+        *self.body
+    }
+
     pub fn location(&self) -> &Location {
         &self.location
     }
