@@ -51,8 +51,8 @@ macro_rules! assert_spanned_err {
 }
 
 use syn::{
-    punctuated::Punctuated, token::Comma, visit_mut::VisitMut, Attribute, Block, ExprArray,
-    ExprReference, ExprStruct, ExprTuple, FieldValue, FnArg, Pat, Signature, Token,
+    visit_mut::VisitMut, Attribute, Block, ExprArray, ExprReference, ExprStruct, ExprTuple,
+    FieldValue, FnArg, Pat, Signature, Token,
 };
 
 /// Hash this `TokenStream` and return an integer that is at most digits
@@ -279,6 +279,15 @@ where
         && path.segments.iter().zip(mtch).all(|(actual, expected)| actual.ident == *expected)
 }
 
+macro_rules! swapped {
+    ($src:expr, $target:expr, $code:expr) => {{
+        std::mem::swap($src, $target);
+        let result = $code;
+        std::mem::swap($src, $target);
+        result
+    }};
+}
+
 /// Classifies the state a function is in in the contract handling pipeline.
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum ContractFunctionState {
@@ -377,7 +386,7 @@ impl ContractFunctionState {
                     identifier_for_generated_function(item_fn, "check", a_short_hash);
                 let replace_fn_name =
                     identifier_for_generated_function(item_fn, "replace", a_short_hash);
-                let dummy_fn_name =
+                let mut dummy_fn_name =
                     identifier_for_generated_function(item_fn, "replace_dummy", a_short_hash);
 
                 // Constructing string literals explicitly here, because if we call
@@ -399,15 +408,25 @@ impl ContractFunctionState {
                 //
                 // We're emitting the original here but the same applies later when we
                 // emit the check function.
-                let attrs = &mut std::mem::replace(&mut item_fn.attrs, vec![]);
-                output.extend(quote!(
-                    #(#attrs)*
-                    #[kanitool::checked_with = #check_fn_name_str]
-                    #[kanitool::replaced_with = #replace_fn_name_str]
-                    #[kanitool::memory_havoc_dummy = #dummy_fn_name_str]
-                    #item_fn
-                ));
-                std::mem::swap(&mut item_fn.attrs, attrs);
+                let mut attrs = vec![];
+                swapped!(&mut item_fn.attrs, &mut attrs, {
+                    swapped!(&mut item_fn.sig.ident, &mut dummy_fn_name, {
+                        let sig = &item_fn.sig;
+                        output.extend(quote!(
+                            #[allow(dead_code, unused_variables)]
+                            #sig {
+                                unreachable!()
+                            }
+                        ));
+                    });
+                    output.extend(quote!(
+                        #(#attrs)*
+                        #[kanitool::checked_with = #check_fn_name_str]
+                        #[kanitool::replaced_with = #replace_fn_name_str]
+                        #[kanitool::memory_havoc_dummy = #dummy_fn_name_str]
+                        #item_fn
+                    ));
+                });
                 Some((Some((replace_fn_name, Some(dummy_fn_name))), Some(check_fn_name)))
             }
             ContractFunctionState::Original | Self::ReplaceDummy => None,
@@ -859,3 +878,4 @@ macro_rules! passthrough {
 }
 
 passthrough!(proof_for_contract, true);
+passthrough!(stub_verified, false);

@@ -2,11 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 use anyhow::Result;
+use std::ffi::OsString;
 use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
 use std::process::Command;
-use std::{collections::HashMap, ffi::OsString};
 
 use crate::metadata::collect_and_link_function_pointer_restrictions;
 use crate::project::Project;

@@ -35,7 +35,7 @@ pub struct QueryDb {
     /// When set, instructs the compiler to produce the symbol table for CBMC in JSON format and use symtab2gb.
     pub write_json_symtab: bool,
     pub reachability_analysis: ReachabilityType,
-    pub stubbing_enabled: bool,
+    stubbing_enabled: bool,
     pub function_contracts_enabled: bool,
     pub unstable_features: Vec<String>,
 
@@ -56,5 +56,13 @@ impl QueryDb {
     /// Get the model path for a given harness.
     pub fn harness_model_path(&self, harness: &DefPathHash) -> Option<&PathBuf> {
         self.harnesses_info.get(harness)
+    }
+
+    pub fn is_stubbing_enabled(&self) -> bool {
+        self.stubbing_enabled | self.function_contracts_enabled
+    }
+
+    pub fn enable_stubbing(&mut self) {
+        self.stubbing_enabled = true;
     }
 }

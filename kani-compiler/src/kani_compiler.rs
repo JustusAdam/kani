@@ -291,7 +291,7 @@ impl KaniCompiler {
                 .collect::<HashMap<_, _>>();
 
             let (no_stubs, with_stubs): (Vec<_>, Vec<_>) =
-                if self.queries.lock().unwrap().stubbing_enabled {
+                if self.queries.lock().unwrap().is_stubbing_enabled() {
                     // Partition harnesses that don't have stub with the ones with stub.
                     all_harnesses
                         .keys()
@@ -406,7 +406,7 @@ impl Callbacks for KaniCompiler {
             if matches.get_flag(parser::ENABLE_STUBBING)
                 && queries.reachability_analysis == ReachabilityType::Harnesses
             {
-                queries.stubbing_enabled = true;
+                queries.enable_stubbing();
             }
 
             debug!(?queries, "config end");

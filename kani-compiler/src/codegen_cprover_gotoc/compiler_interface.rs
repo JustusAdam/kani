@@ -91,6 +91,8 @@ impl GotocCodegenBackend {
         );
         dump_mir_items(tcx, &items, &symtab_goto.with_extension("kani.mir"));
 
+        debug!(reachable_count = items.len(), "Reachable Items");
+
         // Follow rustc naming convention (cx is abbrev for context).
         // https://rustc-dev-guide.rust-lang.org/conventions.html#naming-conventions
         let mut gcx = GotocCtx::new(tcx, (*self.queries.lock().unwrap()).clone(), machine_model);

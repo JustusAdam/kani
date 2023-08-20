@@ -15,7 +15,7 @@ use rustc_middle::ty::layout::{
     FnAbiError, FnAbiOf, FnAbiOfHelpers, FnAbiRequest, HasParamEnv, HasTyCtxt, LayoutError,
     LayoutOfHelpers, TyAndLayout,
 };
-use rustc_middle::ty::{self, Instance, InstanceDef, ParamEnv, Ty, TyCtxt};
+use rustc_middle::ty::{self, BoundVariableKind, Instance, InstanceDef, ParamEnv, Ty, TyCtxt};
 use rustc_session::config::OutputType;
 use rustc_span::source_map::respan;
 use rustc_span::Span;
@@ -30,12 +30,12 @@ use self::attributes::KaniAttributes;
 pub mod analysis;
 pub mod attributes;
 pub mod coercion;
+pub mod contracts;
 pub mod metadata;
 pub mod provide;
 pub mod reachability;
 pub mod resolve;
 pub mod stubbing;
-pub mod contracts;
 
 /// Check that all crate items are supported and there's no misconfiguration.
 /// This method will exhaustively print any error / warning and it will abort at the end if any
@@ -147,8 +147,18 @@ fn check_is_contract_safe<'tcx>(tcx: TyCtxt<'tcx>, instance: Instance<'tcx>) {
         matches!(t.kind(), ty::TyKind::RawPtr(tmut) if tmut.mutbl == rustc_ast::Mutability::Mut)
     }
 
-    let fn_typ =
-        instance.ty(tcx, ParamEnv::reveal_all()).fn_sig(tcx).no_bound_vars().expect("impossible");
+    let bound_fn_sig = instance.ty(tcx, ParamEnv::reveal_all()).fn_sig(tcx);
+
+    for v in bound_fn_sig.bound_vars() {
+        if let BoundVariableKind::Ty(t) = v {
+            tcx.sess.span_warn(
+                tcx.def_span(instance.def_id()),
+                format!("Found a bound type variable {t:?}"),
+            );
+        }
+    }
+
+    let fn_typ = bound_fn_sig.skip_binder();
 
     for (typ, (is_prohibited, r#where, what)) in fn_typ
         .inputs()
