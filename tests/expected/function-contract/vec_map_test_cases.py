@@ -45,7 +45,7 @@ def run_tests(test_cases: abc.Iterable[TestCase], args):
     for tc in test_cases:
         skip = tc.skip is not None and args.index is None and not args.noskip
         check_flag, check_val = ("--check-contract", f"{tc.function}/{tc.harness}") if not args.new_format else ("--harness", tc.harness)
-        cmd = ("kani", "--default-unwind", "10", check_flag, check_val, args.test_file)
+        cmd = ("kani", "-Zfunction-contracts", "--default-unwind", "10", check_flag, check_val, args.test_file)
         if args.echo_commands and not skip:
             print(shlex.join(cmd))
         print(f"Checking function contract for {tc.function} on {tc.harness} ... ", end='', flush=True)
@@ -102,15 +102,15 @@ class TC:
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--fail-fast", action="store_true", help="Abort after the first failed verification or timeout")
-    parser.add_argument("--index", type=int, help="Run test with this number")
+    parser.add_argument("--index", type=int, help="Run test with this number (see --list for which number is which harness)")
     parser.add_argument("--timeout", type=float, default=30.0, help="Abandon verification after this many seconds")
     parser.add_argument("--filter", help="Only run contracts which match this pattern")
-    parser.add_argument("--list", action='store_true')
-    parser.add_argument("--noskip", action='store_true')
-    parser.add_argument("--echo-commands", action='store_true')
-    parser.add_argument("--test-file", default=TEST_FILE)
+    parser.add_argument("--list", action='store_true', help="List available harnesses, then exit")
+    parser.add_argument("--noskip", action='store_true', help="Run all harnesses, even those marked for skipping")
+    parser.add_argument("--echo-commands", action='store_true', help="Echo all shell commands this runs")
+    parser.add_argument("--test-file", default=TEST_FILE, help="The crate file (.rs) that we should be running")
     parser.add_argument("--verbose", action='store_true')
-    parser.add_argument("--new-format", action='store_true')
+    parser.add_argument("--new-format", action='store_true', help="Select harnesses with --harness instead of --check-contract")
     args = parser.parse_args()
 
     if args.list:
