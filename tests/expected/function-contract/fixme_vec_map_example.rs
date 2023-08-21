@@ -602,52 +602,52 @@ mod contract_harnesses {
         )
     }
 
-    #[kani::proof]
-    #[kani::for_contract(VecMap::new)]
+
+    #[kani::proof_for_contract(VecMap::new)]
     fn new_1() {
         let _ = VecMap::<u8, u8>::new();
     }
 
-    #[kani::proof]
-    #[kani::for_contract(VecMap::new)]
+
+    #[kani::proof_for_contract(VecMap::new)]
     fn new_2() {
         let _ = VecMap::<u64, Option<i32>>::new();
     }
 
-    #[kani::proof]
-    #[kani::for_contract(VecMap::with_capacity)]
+
+    #[kani::proof_for_contract(VecMap::with_capacity)]
     fn with_capacity() {
         let len = kani::any();
         let _ = VecMap::<u8, u8>::with_capacity(len);
     }
 
-    #[kani::proof]
+
     #[kani::unwind(20)]
-    #[kani::for_contract(VecMap::clear)]
+    #[kani::proof_for_contract(VecMap::clear)]
     fn clear() {
         let mut m: VecMap<u8, u8> = arbitrary_vec_map();
         m.clear();
     }
 
-    #[kani::proof]
+
     #[kani::unwind(10)]
-    #[kani::for_contract(VecMap::get)]
+    #[kani::proof_for_contract(VecMap::get)]
     fn get() {
         let m: VecMap<u8, u8> = arbitrary_vec_map();
         let k: u8 = kani::any();
         m.get(&k);
     }
 
-    #[kani::proof]
-    #[kani::for_contract(VecMap::get_mut)]
+
+    #[kani::proof_for_contract(VecMap::get_mut)]
     fn get_mut() {
         let mut m: VecMap<u8, u8> = arbitrary_vec_map();
         let k: u8 = kani::any();
         m.get_mut(&k);
     }
 
-    #[kani::proof]
-    #[kani::for_contract(VecMap::insert)]
+
+    #[kani::proof_for_contract(VecMap::insert)]
     fn insert() {
         let mut m: VecMap<u8, u8> = arbitrary_vec_map();
         let k: u8 = kani::any();
@@ -655,24 +655,24 @@ mod contract_harnesses {
         m.insert(k, v);
     }
 
-    #[kani::proof]
-    #[kani::for_contract(VecMap::get_key_value)]
+
+    #[kani::proof_for_contract(VecMap::get_key_value)]
     fn get_key_value() {
         let m: VecMap<u8, u8> = arbitrary_vec_map();
         let k: u8 = kani::any();
         m.get_key_value(&k);
     }
 
-    #[kani::proof]
-    #[kani::for_contract(VecMap::remove)]
+
+    #[kani::proof_for_contract(VecMap::remove)]
     fn remove() {
         let mut m: VecMap<u8, u8> = arbitrary_vec_map();
         let k: u8 = kani::any();
         m.remove(&k);
     }
 
-    #[kani::proof]
-    #[kani::for_contract(VecMap::remove_entry)]
+
+    #[kani::proof_for_contract(VecMap::remove_entry)]
     fn remove_entry() {
         let mut m: VecMap<u8, u8> = arbitrary_vec_map();
         let k: u8 = kani::any();
