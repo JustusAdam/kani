@@ -15,6 +15,7 @@ pub struct GFnContract<C, A> {
     requires: Vec<C>,
     ensures: Vec<C>,
     assigns: Vec<A>,
+    frees: Vec<A>,
 }
 
 impl<C, A> GFnContract<C, A> {
@@ -32,7 +33,11 @@ impl<C, A> GFnContract<C, A> {
         &self.assigns
     }
 
-    pub fn new(requires: Vec<C>, ensures: Vec<C>, assigns: Vec<A>) -> Self {
-        Self { requires, ensures, assigns }
+    pub fn frees(&self) -> &[A] {
+        &self.frees
+    }
+
+    pub fn new(requires: Vec<C>, ensures: Vec<C>, assigns: Vec<A>, frees: Vec<A>) -> Self {
+        Self { requires, ensures, assigns, frees }
     }
 }

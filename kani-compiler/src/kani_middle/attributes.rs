@@ -42,6 +42,7 @@ enum KaniAttributeKind {
     Unstable,
     Unwind,
     Assigns,
+    Frees,
     StubVerified,
     /// A harness, similar to [`Self::Proof`], but for checking a function
     /// contract, e.g. the contract check is substituted for the target function
@@ -70,6 +71,7 @@ impl KaniAttributeKind {
             | KaniAttributeKind::Unwind => true,
             KaniAttributeKind::Unstable
             | KaniAttributeKind::Assigns
+            | KaniAttributeKind::Frees
             | KaniAttributeKind::ReplacedWith
             | KaniAttributeKind::CheckedWith
             | KaniAttributeKind::MemoryHavocDummy
@@ -155,7 +157,7 @@ impl<'tcx> KaniAttributes<'tcx> {
     pub fn interpret_the_for_contract_attribute(&self) -> Option<(Symbol, DefId, Span)> {
         self.expect_maybe_one(KaniAttributeKind::ProofForContract).and_then(|target| {
             let name = expect_key_string_value(self.tcx.sess, target);
-            let resolved = self.resolve_from_self(name.as_str());
+            let resolved = self.resolve_sibling(name.as_str());
             match resolved {
                 Err(e) => {
                     self.tcx.sess.span_err(
@@ -177,7 +179,7 @@ impl<'tcx> KaniAttributes<'tcx> {
             attr.iter()
                 .filter_map(|attr| {
                     let name = expect_key_string_value(self.tcx.sess, attr);
-                    let resolved = self.resolve_from_self(name.as_str());
+                    let resolved = self.resolve_sibling(name.as_str());
                     match resolved {
                         Err(e) => {
                             self.tcx.sess.span_err(
@@ -209,13 +211,35 @@ impl<'tcx> KaniAttributes<'tcx> {
     }
 
     pub fn memory_havoc_dummy(&self) -> Option<DefId> {
-        let target = self
+        use rustc_hir::{Item, ItemKind, Mod, Node};
+        let name = self
             .expect_maybe_one(KaniAttributeKind::MemoryHavocDummy)
             .map(|target| expect_key_string_value(self.tcx.sess, target))?;
-        Some(self.resolve_from_self(target.as_str()).unwrap())
+
+        let hir_map = self.tcx.hir();
+        let hir_id = hir_map.local_def_id_to_hir_id(self.item.expect_local());
+        let find_in_mod = |md: &Mod<'_>| {
+            md.item_ids.iter().find(|it| hir_map.item(**it).ident.name == name).unwrap().hir_id()
+        };
+
+        let result = match hir_map.get_parent(hir_id) {
+            Node::Item(Item { kind, .. }) => match kind {
+                ItemKind::Mod(m) => find_in_mod(m),
+                ItemKind::Impl(imp) => {
+                    imp.items.iter().find(|it| it.ident.name == name).unwrap().id.hir_id()
+                }
+                other => panic!("Odd parent item kind {other:?}"),
+            },
+            Node::Crate(m) => find_in_mod(m),
+            other => panic!("Odd prant node type {other:?}"),
+        }
+        .expect_owner()
+        .def_id
+        .to_def_id();
+        Some(result)
     }
 
-    fn resolve_from_self(&self, path_str: &str) -> Result<DefId, ResolveError<'tcx>> {
+    fn resolve_sibling(&self, path_str: &str) -> Result<DefId, ResolveError<'tcx>> {
         resolve_fn(self.tcx, self.tcx.parent_module_from_def_id(self.item.expect_local()), path_str)
     }
 
@@ -283,6 +307,9 @@ impl<'tcx> KaniAttributes<'tcx> {
                 }
                 KaniAttributeKind::Assigns => {
                     self.assigns_contract();
+                }
+                KaniAttributeKind::Frees => {
+                    self.frees_contract();
                 }
             }
         }
@@ -388,6 +415,7 @@ impl<'tcx> KaniAttributes<'tcx> {
                     KaniAttributeKind::CheckedWith
                     | KaniAttributeKind::IsContractGenerated
                     | KaniAttributeKind::Assigns
+                    | KaniAttributeKind::Frees
                     | KaniAttributeKind::MemoryHavocDummy
                     | KaniAttributeKind::ReplacedWith => {
                         todo!("Contract attributes are not supported on proofs")
@@ -464,6 +492,20 @@ impl<'tcx> KaniAttributes<'tcx> {
                 .collect()
         })
     }
+
+    pub fn frees_contract(&self) -> Option<Vec<Place<'tcx>>> {
+        let local_def_id = self.item.expect_local();
+        self.map.get(&KaniAttributeKind::Frees).map(|attr| {
+            attr.iter()
+                .flat_map(|clause| match &clause.get_normal_item().args {
+                    AttrArgs::Delimited(lvals) => {
+                        parse_frees_values(self.tcx, local_def_id, &lvals.tokens)
+                    }
+                    _ => unreachable!(),
+                })
+                .collect()
+        })
+    }
 }
 
 /// An efficient check for the existence for a particular [`KaniAttributeKind`].
@@ -522,6 +564,7 @@ fn parse_place<'tcx, 'b, I: Iterator<Item = &'b TokenTree>>(
     tcx: TyCtxt<'tcx>,
     local_def_id: LocalDefId,
     t: &mut I,
+    deny_wildcard_subslice: Option<&str>,
 ) -> Option<Place<'tcx>> {
     let mir = tcx.optimized_mir(local_def_id);
     macro_rules! comma_tok {
@@ -544,7 +587,8 @@ fn parse_place<'tcx, 'b, I: Iterator<Item = &'b TokenTree>>(
         let mut base: Place<'tcx> = match tree {
             TokenTree::Delimited(_, Delimiter::Parenthesis, inner) => {
                 let mut it = inner.trees();
-                let Some(res) = parse_place(tcx, local_def_id, &mut it) else {
+                let Some(res) = parse_place(tcx, local_def_id, &mut it, deny_wildcard_subslice)
+                else {
                     tcx.sess.span_err(tree.span(), "Expected an lvalue in the parantheses");
                     return None;
                 };
@@ -569,7 +613,7 @@ fn parse_place<'tcx, 'b, I: Iterator<Item = &'b TokenTree>>(
                     Place::from(local)
                 }
                 TokenKind::BinOp(BinOpToken::Star) => {
-                    let Some(res) = parse_place(tcx, local_def_id, t)
+                    let Some(res) = parse_place(tcx, local_def_id, t, deny_wildcard_subslice)
                         .map(|p| p.project_deeper(&[ProjectionElem::Deref], tcx))
                     else {
                         tcx.sess.span_err(
@@ -637,6 +681,15 @@ fn parse_place<'tcx, 'b, I: Iterator<Item = &'b TokenTree>>(
                                     "Wildcard slice pattern is only supported as last projection",
                                 );
                             }
+                            if let Some(elem) = deny_wildcard_subslice {
+                                tcx.sess.span_err(
+                                    tok.span(),
+                                    format!(
+                                        "Wildcard subslice pattern is not allowed in {}.",
+                                        elem
+                                    ),
+                                );
+                            }
                             return Some(base.project_deeper(&[wildcard_subslice()], tcx));
                         }
                         _ => tcx.sess.span_fatal(
@@ -663,8 +716,22 @@ fn parse_assign_values<'tcx: 'a, 'a>(
     t: &'a TokenStream,
 ) -> impl Iterator<Item = Place<'tcx>> + 'a {
     let mut it = t.trees().peekable();
-    std::iter::from_fn(move || it.peek().is_some().then(|| parse_place(tcx, local_def_id, &mut it)))
-        .filter_map(std::convert::identity)
+    std::iter::from_fn(move || {
+        it.peek().is_some().then(|| parse_place(tcx, local_def_id, &mut it, None))
+    })
+    .filter_map(std::convert::identity)
+}
+
+fn parse_frees_values<'tcx: 'a, 'a>(
+    tcx: TyCtxt<'tcx>,
+    local_def_id: LocalDefId,
+    t: &'a TokenStream,
+) -> impl Iterator<Item = Place<'tcx>> + 'a {
+    let mut it = t.trees().peekable();
+    std::iter::from_fn(move || {
+        it.peek().is_some().then(|| parse_place(tcx, local_def_id, &mut it, Some("`frees` clause")))
+    })
+    .filter_map(std::convert::identity)
 }
 
 /// Expect the contents of this attribute to be of the format #[attribute =

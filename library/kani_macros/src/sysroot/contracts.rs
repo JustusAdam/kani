@@ -73,22 +73,29 @@ fn identifier_for_generated_function(related_function: &ItemFn, purpose: &str, h
     Ident::new(&identifier, proc_macro2::Span::mixed_site())
 }
 
-#[allow(dead_code)]
 pub fn requires(attr: TokenStream, item: TokenStream) -> TokenStream {
     requires_ensures_alt(attr, item, true)
 }
 
-#[allow(dead_code)]
 pub fn ensures(attr: TokenStream, item: TokenStream) -> TokenStream {
     requires_ensures_alt(attr, item, false)
 }
 
-#[allow(dead_code)]
 pub fn assigns(attr: TokenStream, item: TokenStream) -> TokenStream {
     let item = proc_macro2::TokenStream::from(item);
     let attr = proc_macro2::TokenStream::from(attr);
     quote!(
         #[kanitool::assigns(#attr)]
+        #item
+    )
+    .into()
+}
+
+pub fn frees(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let item = proc_macro2::TokenStream::from(item);
+    let attr = proc_macro2::TokenStream::from(attr);
+    quote!(
+        #[kanitool::frees(#attr)]
         #item
     )
     .into()

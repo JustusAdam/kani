@@ -608,6 +608,10 @@ impl goto_program::Symbol {
                 IrepId::CSpecAssigns,
                 Irep::just_sub(contract.assigns.iter().map(|req| req.to_irep(mm)).collect()),
             );
+            typ = typ.with_named_sub(
+                IrepId::CSpecFrees,
+                Irep::just_sub(contract.frees.iter().map(|req| req.to_irep(mm)).collect()),
+            );
         }
         super::Symbol {
             typ,

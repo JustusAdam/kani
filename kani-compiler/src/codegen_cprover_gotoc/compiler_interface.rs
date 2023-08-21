@@ -163,7 +163,9 @@ impl GotocCodegenBackend {
                             .or(contract_metadata.replace_contracts.contains(did).then_some(true))
                         {
                             let attrs = KaniAttributes::for_item(tcx, *did);
-                            let contract = attrs.assigns_contract().unwrap_or_else(Vec::new);
+                            let assigns_contract =
+                                attrs.assigns_contract().unwrap_or_else(Vec::new);
+                            let frees_contract = attrs.frees_contract().unwrap_or_else(Vec::new);
                             let enforcement_target = if is_replace {
                                 let did = attrs.memory_havoc_dummy().unwrap();
                                 Instance::expect_resolve(
@@ -177,7 +179,7 @@ impl GotocCodegenBackend {
                             };
                             gcx.attach_contract(
                                 enforcement_target,
-                                &GFnContract::new(vec![], vec![], contract),
+                                &GFnContract::new(vec![], vec![], assigns_contract, frees_contract),
                             );
                             let name = tcx.symbol_name(enforcement_target).to_string();
                             if is_replace {

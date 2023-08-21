@@ -310,6 +310,28 @@ impl<'tcx> GotocCtx<'tcx> {
             )
         };
 
+        let handle_lval_contract = |slf: &mut GotocCtx<'tcx>,
+                                    clauses: &[Place<'tcx>],
+                                    wildcard_allowed: bool| {
+            clauses
+                .iter()
+                .map(|lval| {
+                    let body = match lval.projection.split_last() {
+                        Some((elem, rest)) if *elem == wildcard_subslice() => {
+                            assert!(wildcard_allowed);
+                            let last_popped = Place::from(lval.local).project_deeper(rest, slf.tcx);
+                            let target = MemoryTarget::ObjectWhole(
+                                slf.codegen_place(&last_popped).unwrap().goto_expr,
+                            );
+                            Expr::unconditional_target_group(target)
+                        }
+                        _ => slf.codegen_place(lval).unwrap().goto_expr,
+                    };
+                    Lambda::as_contract_for(&goto_annotated_fn_typ, None, body)
+                })
+                .collect()
+        };
+
         let requires = fn_contract
             .requires()
             .iter()
@@ -322,24 +344,9 @@ impl<'tcx> GotocCtx<'tcx> {
             .copied()
             .map(|contract| handle_contract_expr(contract, true))
             .collect();
-        let assigns = fn_contract
-            .assigns()
-            .iter()
-            .map(|lval| {
-                let body = match lval.projection.split_last() {
-                    Some((elem, rest)) if *elem == wildcard_subslice() => {
-                        let last_popped = Place::from(lval.local).project_deeper(rest, self.tcx);
-                        let target = MemoryTarget::ObjectWhole(
-                            self.codegen_place(&last_popped).unwrap().goto_expr,
-                        );
-                        Expr::unconditional_target_group(target)
-                    }
-                    _ => self.codegen_place(lval).unwrap().goto_expr,
-                };
-                Lambda::as_contract_for(&goto_annotated_fn_typ, None, body)
-            })
-            .collect();
-        FunctionContract::new(requires, ensures, assigns)
+        let assigns = handle_lval_contract(self, fn_contract.assigns(), true);
+        let frees = handle_lval_contract(self, fn_contract.frees(), false);
+        FunctionContract::new(requires, ensures, assigns, frees)
     }
 
     #[cfg(feature = "inlined-goto-contracts")]

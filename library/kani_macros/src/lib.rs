@@ -143,6 +143,11 @@ pub fn assigns(attr: TokenStream, item: TokenStream) -> TokenStream {
     attr_impl::assigns(attr, item)
 }
 
+#[proc_macro_attribute]
+pub fn frees(attr: TokenStream, item: TokenStream) -> TokenStream {
+    attr_impl::frees(attr, item)
+}
+
 /// Designates this function as a harness to check a function contract.
 ///
 /// The argument to this macro is the relative path (e.g. `foo` or
@@ -180,7 +185,7 @@ mod sysroot {
 
     mod contracts;
 
-    pub use contracts::{assigns, ensures, proof_for_contract, requires, stub_verified};
+    pub use contracts::{assigns, ensures, frees, proof_for_contract, requires, stub_verified};
 
     use super::*;
 
@@ -356,4 +361,5 @@ mod regular {
     no_op!(assigns);
     no_op!(proof_for_contract);
     no_op!(stub_verified);
+    no_op!(frees);
 }

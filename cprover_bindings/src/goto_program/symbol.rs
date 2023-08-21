@@ -91,11 +91,17 @@ pub struct FunctionContract {
     pub(crate) requires: Vec<Lambda>,
     pub(crate) ensures: Vec<Lambda>,
     pub(crate) assigns: Vec<Lambda>,
+    pub(crate) frees: Vec<Lambda>,
 }
 
 impl FunctionContract {
-    pub fn new(requires: Vec<Lambda>, ensures: Vec<Lambda>, assigns: Vec<Lambda>) -> Self {
-        Self { requires, ensures, assigns }
+    pub fn new(
+        requires: Vec<Lambda>,
+        ensures: Vec<Lambda>,
+        assigns: Vec<Lambda>,
+        frees: Vec<Lambda>,
+    ) -> Self {
+        Self { requires, ensures, assigns, frees }
     }
 }
 
@@ -172,6 +178,7 @@ impl Symbol {
                 prior.assigns.extend(contract.assigns);
                 prior.requires.extend(contract.requires);
                 prior.ensures.extend(contract.ensures);
+                prior.frees.extend(contract.frees);
             }
             None => self.contract = Some(Box::new(contract)),
         }
