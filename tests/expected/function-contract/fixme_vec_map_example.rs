@@ -107,6 +107,7 @@ impl<K, V> VecMap<K, V> {
     #[post(implies(old(self.contains_key(&key)), result.is_some()))]
     #[kani::assigns((*self).keys.buf.ptr.pointer.pointer[..], (*self).keys.buf.cap, (*self).keys.len, (*self).keys.buf.ptr)]
     #[kani::assigns((*self).values.buf.ptr.pointer.pointer[..], (*self).values.buf.cap, (*self).values.len, (*self).values.buf.ptr)]
+    #[kani::frees((*self).values.buf.ptr.pointer.pointer, (*self).keys.buf.ptr.pointer.pointer)]
     pub fn insert(&mut self, key: K, mut value: V) -> Option<V>
     where
         K: PartialEq,
@@ -567,6 +568,7 @@ fn reorder() {
 
 #[kani::proof]
 #[kani::unwind(10)]
+#[kani::stub_verified(VecMap::insert)]
 #[kani::stub(core::fmt::Arguments::new_const, ArgumentsProxy::new_consts)]
 fn unsized_key_queries() {
     let mut map = VecMap::<String, u8>::new();
@@ -578,6 +580,7 @@ fn unsized_key_queries() {
 
 #[kani::proof]
 #[kani::unwind(10)]
+#[kani::stub_verified(VecMap::insert)]
 fn int_key_queries() {
     let mut map = VecMap::<u8, u8>::new();
     let key = kani::any();
