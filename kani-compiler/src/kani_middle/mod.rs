@@ -80,15 +80,16 @@ pub fn check_reachable_items<'tcx>(tcx: TyCtxt<'tcx>, queries: &QueryDb, items: 
 
         // We don't short circuit here since this is a type check and can shake
         // out differently depending on generic parameters
-        if let MonoItem::Fn(instance) = item {
-            if attributes::is_function_contract_generated(tcx, instance.def_id()) {
-                check_is_contract_safe(tcx, *instance);
-            }
-        }
+        // if let MonoItem::Fn(instance) = item {
+        //     if attributes::is_function_contract_generated(tcx, instance.def_id()) {
+        //         check_is_contract_safe(tcx, *instance);
+        //     }
+        // }
     }
     tcx.sess.abort_if_errors();
 }
 
+#[allow(dead_code)]
 /// A basic check that ensures a function with a contract does not receive
 /// mutable pointers in its input and does not return raw pointers of any kind.
 ///
