@@ -63,7 +63,7 @@ impl<T> Arr<T> {
     }
 }
 
-#[kani::proof_for_contract(push)]
+#[kani::proof_for_contract(Arr::push)]
 fn push_contract() {
     let _ = Box::new(0_usize);
     let mut arr = Arr::<u8>::new();

@@ -1,0 +1,9 @@
+memcpy.assigns\
+- Status: SUCCESS\
+- Description: "Check that array_copy((const void *)src_n, ...) is allowed by the assigns clause"
+
+memcpy.assigns\
+- Status: SUCCESS\
+- Description: "Check that array_replace((const void *)(char *)dst, ...) is allowed by the assigns clause"
+
+VERIFICATION:- SUCCESSFUL
