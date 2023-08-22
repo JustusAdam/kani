@@ -395,26 +395,34 @@ impl ToIrep for ExprValue {
 
 impl ToIrep for MemoryTarget {
     fn to_irep(&self, mm: &MachineModel) -> Irep {
-        match self {
-            MemoryTarget::Lvalue(e) => e.to_irep(mm),
-            MemoryTarget::ObjectWhole(obj) => side_effect_irep(
-                IrepId::FunctionCall,
-                vec![
-                    Irep::symbol("__CPROVER_object_whole".into()).with_type(
-                        &Type::Code {
-                            parameters: vec![Parameter::new(
-                                Some("ptr"),
-                                None,
-                                Type::Pointer { typ: Box::new(Type::Empty) },
-                            )],
-                            return_type: Box::new(Type::Empty),
-                        },
-                        mm,
-                    ),
-                    arguments_irep([obj].into_iter(), mm),
-                ],
+        let (fn_name, extra_typ, args) = match self {
+            MemoryTarget::Lvalue(e) => return e.to_irep(mm),
+            MemoryTarget::ObjectWhole(obj) => {
+                ("__CPROVER_object_whole", None, Box::new([obj]) as Box<[&Expr]>)
+            }
+            MemoryTarget::ObjectFrom(obj) => {
+                ("__CPROVER_object_from", None, Box::new([obj]) as Box<_>)
+            }
+            MemoryTarget::ObjectUpto(obj, to) => (
+                "__CPROVER_object_upto",
+                Some(Parameter::new(Some("uint"), None, Type::unsigned_int(64))),
+                Box::new([obj, to]) as Box<_>,
             ),
+        };
+
+        let mut parameters =
+            vec![Parameter::new(Some("ptr"), None, Type::Pointer { typ: Box::new(Type::Empty) })];
+        if let Some(t) = extra_typ {
+            parameters.push(t);
         }
+        side_effect_irep(
+            IrepId::FunctionCall,
+            vec![
+                Irep::symbol(fn_name.into())
+                    .with_type(&Type::Code { parameters, return_type: Box::new(Type::Empty) }, mm),
+                arguments_irep(args.into_iter().cloned(), mm),
+            ],
+        )
     }
 }
 

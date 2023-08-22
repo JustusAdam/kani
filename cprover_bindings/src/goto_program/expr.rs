@@ -198,7 +198,9 @@ pub enum MemoryTarget {
     // | __CPROVER_typed_target(lvalue-expr)
     ObjectWhole(Expr),
     // | __CPROVER_object_from(ptr-expr)
+    ObjectFrom(Expr),
     // | __CPROVER_object_upto(ptr-expr, uint-expr)
+    ObjectUpto(Expr, Expr),
 }
 
 /// Binary operators. The names are the same as in the Irep representation.

@@ -11,14 +11,14 @@
 /// since in theory a CBMC code gen for any clause has been implemented thus
 /// this parallels the structure expected by CBMC.
 #[derive(Default)]
-pub struct GFnContract<C, A> {
+pub struct GFnContract<C, A, F> {
     requires: Vec<C>,
     ensures: Vec<C>,
     assigns: Vec<A>,
-    frees: Vec<A>,
+    frees: Vec<F>,
 }
 
-impl<C, A> GFnContract<C, A> {
+impl<C, A, F> GFnContract<C, A, F> {
     /// Read access to all precondition clauses.
     pub fn requires(&self) -> &[C] {
         &self.requires
@@ -33,11 +33,11 @@ impl<C, A> GFnContract<C, A> {
         &self.assigns
     }
 
-    pub fn frees(&self) -> &[A] {
+    pub fn frees(&self) -> &[F] {
         &self.frees
     }
 
-    pub fn new(requires: Vec<C>, ensures: Vec<C>, assigns: Vec<A>, frees: Vec<A>) -> Self {
+    pub fn new(requires: Vec<C>, ensures: Vec<C>, assigns: Vec<A>, frees: Vec<F>) -> Self {
         Self { requires, ensures, assigns, frees }
     }
 }

@@ -4,6 +4,7 @@
 //! This file contains functions related to codegenning MIR functions into gotoc
 
 use crate::codegen_cprover_gotoc::GotocCtx;
+use crate::kani_middle::attributes::AssignsRange;
 use crate::kani_middle::contracts::GFnContract;
 use cbmc::goto_program::{Expr, FunctionContract, Lambda, Stmt, Symbol, Type};
 use cbmc::InternString;
@@ -250,12 +251,10 @@ impl<'tcx> GotocCtx<'tcx> {
     #[cfg(not(feature = "inlined-goto-contracts"))]
     fn as_goto_contract(
         &mut self,
-        fn_contract: &GFnContract<Instance<'tcx>, Place<'tcx>>,
+        fn_contract: &GFnContract<Instance<'tcx>, AssignsRange<'tcx>, Place<'tcx>>,
     ) -> FunctionContract {
         use cbmc::goto_program::MemoryTarget;
         use rustc_middle::mir;
-
-        use crate::kani_middle::attributes::wildcard_subslice;
 
         let goto_annotated_fn_name = self.current_fn().name();
         let goto_annotated_fn_typ = self
@@ -310,22 +309,33 @@ impl<'tcx> GotocCtx<'tcx> {
             )
         };
 
-        let handle_lval_contract = |slf: &mut GotocCtx<'tcx>,
-                                    clauses: &[Place<'tcx>],
-                                    wildcard_allowed: bool| {
+        let handle_lval_contract = |slf: &mut GotocCtx<'tcx>, clauses: &[AssignsRange<'tcx>]| {
             clauses
                 .iter()
                 .map(|lval| {
-                    let body = match lval.projection.split_last() {
-                        Some((elem, rest)) if *elem == wildcard_subslice() => {
-                            assert!(wildcard_allowed);
-                            let last_popped = Place::from(lval.local).project_deeper(rest, slf.tcx);
-                            let target = MemoryTarget::ObjectWhole(
-                                slf.codegen_place(&last_popped).unwrap().goto_expr,
-                            );
-                            Expr::unconditional_target_group(target)
-                        }
-                        _ => slf.codegen_place(lval).unwrap().goto_expr,
+                    let ptr = slf.codegen_place(&lval.base()).unwrap().goto_expr;
+                    let body = if let Some(slc) = lval.slice() {
+                        let target = match slc {
+                            (None, None) => MemoryTarget::ObjectWhole(ptr),
+                            (Some(from), None) => MemoryTarget::ObjectFrom(
+                                ptr.plus(slf.codegen_place(&from).unwrap().goto_expr),
+                            ),
+                            (frm, Some(to)) => {
+                                let base = if let Some(from) = frm {
+                                    ptr.plus(slf.codegen_place(&from).unwrap().goto_expr)
+                                } else {
+                                    ptr
+                                };
+                                MemoryTarget::ObjectUpto(
+                                    base,
+                                    slf.codegen_place(&to).unwrap().goto_expr,
+                                )
+                            }
+                        };
+
+                        Expr::unconditional_target_group(target)
+                    } else {
+                        ptr
                     };
                     Lambda::as_contract_for(&goto_annotated_fn_typ, None, body)
                 })
@@ -344,8 +354,18 @@ impl<'tcx> GotocCtx<'tcx> {
             .copied()
             .map(|contract| handle_contract_expr(contract, true))
             .collect();
-        let assigns = handle_lval_contract(self, fn_contract.assigns(), true);
-        let frees = handle_lval_contract(self, fn_contract.frees(), false);
+        let assigns = handle_lval_contract(self, fn_contract.assigns());
+        let frees = fn_contract
+            .frees()
+            .iter()
+            .map(|lval| {
+                Lambda::as_contract_for(
+                    &goto_annotated_fn_typ,
+                    None,
+                    self.codegen_place(&lval).unwrap().goto_expr,
+                )
+            })
+            .collect();
         FunctionContract::new(requires, ensures, assigns, frees)
     }
 
@@ -435,7 +455,7 @@ impl<'tcx> GotocCtx<'tcx> {
     pub fn attach_contract(
         &mut self,
         instance: Instance<'tcx>,
-        contract: &GFnContract<Instance<'tcx>, Place<'tcx>>,
+        contract: &GFnContract<Instance<'tcx>, AssignsRange<'tcx>, Place<'tcx>>,
     ) {
         // This should be safe, since the contract is pretty much evaluated as
         // though it was the first (or last) assertion in the function.

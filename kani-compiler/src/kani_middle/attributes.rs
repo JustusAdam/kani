@@ -479,7 +479,7 @@ impl<'tcx> KaniAttributes<'tcx> {
         }
     }
 
-    pub fn assigns_contract(&self) -> Option<Vec<Place<'tcx>>> {
+    pub fn assigns_contract(&self) -> Option<Vec<AssignsRange<'tcx>>> {
         let local_def_id = self.item.expect_local();
         self.map.get(&KaniAttributeKind::Assigns).map(|attr| {
             attr.iter()
@@ -547,31 +547,85 @@ pub fn test_harness_name(tcx: TyCtxt, def_id: DefId) -> String {
     parse_str_value(&marker).unwrap()
 }
 
-pub fn wildcard_subslice<'tcx>() -> PlaceElem<'tcx> {
-    ProjectionElem::Subslice { from: u64::MAX, to: u64::MAX, from_end: false }
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+pub struct AssignsRange<'tcx> {
+    base: Place<'tcx>,
+    slice: Option<(Option<Place<'tcx>>, Option<Place<'tcx>>)>,
 }
 
-/// Parse a place (base variable with a serias of projections) from an iterator
+impl<'tcx> AssignsRange<'tcx> {
+    fn expect_base_only(self) -> Place<'tcx> {
+        assert!(self.slice.is_none());
+        self.base
+    }
+
+    fn project_deeper(mut self, projections: &[PlaceElem<'tcx>], tcx: TyCtxt<'tcx>) -> Self {
+        self.base = self.base.project_deeper(projections, tcx);
+        self
+    }
+
+    pub fn base(self) -> Place<'tcx> {
+        self.base
+    }
+
+    pub fn slice(self) -> Option<(Option<Place<'tcx>>, Option<Place<'tcx>>)> {
+        self.slice
+    }
+}
+
+struct UntilDotDot<I> {
+    inner: I,
+    seen_dot_dot: bool,
+}
+macro_rules! comma_tok {
+    () => {
+        TokenTree::Token(Token { kind: TokenKind::Comma, .. }, _)
+    };
+}
+macro_rules! dot_dot_tok {
+    () => {
+        TokenTree::Token(Token { kind: TokenKind::DotDot, .. }, _)
+    };
+}
+
+impl<'a, I: Iterator<Item = &'a TokenTree>> Iterator for UntilDotDot<I> {
+    type Item = &'a TokenTree;
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.seen_dot_dot {
+            return None;
+        }
+        let nxt = self.inner.next()?;
+        if matches!(nxt, dot_dot_tok!()) {
+            self.seen_dot_dot;
+            None
+        } else {
+            Some(nxt)
+        }
+    }
+}
+
+impl<I> UntilDotDot<I> {
+    fn new(inner: I) -> Self {
+        Self { inner, seen_dot_dot: false }
+    }
+}
+/// Parse a place (base variable with a series of projections) from an iterator
 /// over a tokens.
 ///
-/// Terminates when the iterator is empty *or* a `,` token is encoutered.
+/// Terminates when the iterator is empty *or* a `,` token is encountered.
 /// Guarantees to leave the iterator either empty *or* at the token directly
 /// after `,`.
 ///
-/// Returns `None` if no tokens are encoutered before iterator end or the `,`
+/// Returns `None` if no tokens are encountered before iterator end or the `,`
 /// token or if there were errors, which are emitted with `tcx.sess`
 fn parse_place<'tcx, 'b, I: Iterator<Item = &'b TokenTree>>(
     tcx: TyCtxt<'tcx>,
     local_def_id: LocalDefId,
     t: &mut I,
     deny_wildcard_subslice: Option<&str>,
-) -> Option<Place<'tcx>> {
+) -> Option<AssignsRange<'tcx>> {
     let mir = tcx.optimized_mir(local_def_id);
-    macro_rules! comma_tok {
-        () => {
-            TokenTree::Token(Token { kind: TokenKind::Comma, .. }, _)
-        };
-    }
+
     let local_decls = &mir.local_decls;
     // Skips the iterator forward until either it is empty or a `,` token is encountered
     let skip = |t: &mut I| {
@@ -584,12 +638,12 @@ fn parse_place<'tcx, 'b, I: Iterator<Item = &'b TokenTree>>(
                 "Parse error in assigns clause, expected `*`, identifier or parentheses",
             )
         };
-        let mut base: Place<'tcx> = match tree {
+        let mut base: AssignsRange<'tcx> = match tree {
             TokenTree::Delimited(_, Delimiter::Parenthesis, inner) => {
                 let mut it = inner.trees();
                 let Some(res) = parse_place(tcx, local_def_id, &mut it, deny_wildcard_subslice)
                 else {
-                    tcx.sess.span_err(tree.span(), "Expected an lvalue in the parantheses");
+                    tcx.sess.span_err(tree.span(), "Expected an lvalue in the parentheses");
                     return None;
                 };
                 if !it.next().is_none() {
@@ -610,7 +664,7 @@ fn parse_place<'tcx, 'b, I: Iterator<Item = &'b TokenTree>>(
                         .find(|(name, _decl)| name.name == *id)
                         .unwrap()
                         .1;
-                    Place::from(local)
+                    AssignsRange { base: Place::from(local), slice: None }
                 }
                 TokenKind::BinOp(BinOpToken::Star) => {
                     let Some(res) = parse_place(tcx, local_def_id, t, deny_wildcard_subslice)
@@ -640,7 +694,7 @@ fn parse_place<'tcx, 'b, I: Iterator<Item = &'b TokenTree>>(
                                 _,
                             ),
                         ) => {
-                            let pty = base.ty(local_decls, tcx);
+                            let pty = base.expect_base_only().ty(local_decls, tcx);
                             let (adt_def, _) = match pty.ty.kind() {
                                 TyKind::Adt(adt, substs) => (adt, substs),
                                 _ => panic!(),
@@ -672,31 +726,33 @@ fn parse_place<'tcx, 'b, I: Iterator<Item = &'b TokenTree>>(
                     },
                     _ => panic!("Unexpected token {tree:?}"),
                 },
-                TokenTree::Delimited(_, Delimiter::Bracket, inner) => {
-                    match inner.trees().collect::<Vec<_>>().as_slice() {
-                        [tok @ TokenTree::Token(Token { kind: TokenKind::DotDot, .. }, _)] => {
-                            if !matches!(t.next(), None | Some(comma_tok!())) {
-                                tcx.sess.span_err(
-                                    tok.span(),
-                                    "Wildcard slice pattern is only supported as last projection",
-                                );
-                            }
-                            if let Some(elem) = deny_wildcard_subslice {
-                                tcx.sess.span_err(
-                                    tok.span(),
-                                    format!(
-                                        "Wildcard subslice pattern is not allowed in {}.",
-                                        elem
-                                    ),
-                                );
-                            }
-                            return Some(base.project_deeper(&[wildcard_subslice()], tcx));
-                        }
-                        _ => tcx.sess.span_fatal(
-                            tree.span(),
-                            "Unexpected token, expected slice pattern `..`",
-                        ),
+                tok @ TokenTree::Delimited(_, Delimiter::Bracket, inner) => {
+                    let mut it = inner.trees();
+                    let mut until_dot_dot = UntilDotDot::new(it.by_ref());
+                    let from =
+                        parse_place(tcx, local_def_id, &mut until_dot_dot, deny_wildcard_subslice)
+                            .map(AssignsRange::expect_base_only);
+                    let saw_dot_dot = until_dot_dot.seen_dot_dot;
+                    assert!(!saw_dot_dot || it.next().is_none());
+                    let to = parse_place(tcx, local_def_id, &mut it, deny_wildcard_subslice)
+                        .map(AssignsRange::expect_base_only);
+
+                    if !matches!(t.next(), None | Some(comma_tok!())) {
+                        tcx.sess.span_err(
+                            tok.span(),
+                            "Slice pattern is only supported as last projection",
+                        );
                     }
+                    if let Some(elem) = deny_wildcard_subslice {
+                        tcx.sess.span_err(
+                            tok.span(),
+                            format!("Subslice pattern is not allowed in {}.", elem),
+                        );
+                    }
+                    return Some(AssignsRange {
+                        base: base.expect_base_only(),
+                        slice: Some((from, to)),
+                    });
                 }
                 tok => tcx.sess.span_fatal(
                     tok.span(),
@@ -706,7 +762,7 @@ fn parse_place<'tcx, 'b, I: Iterator<Item = &'b TokenTree>>(
         }
         Some(base)
     } else {
-        panic!()
+        None
     }
 }
 
@@ -714,7 +770,7 @@ fn parse_assign_values<'tcx: 'a, 'a>(
     tcx: TyCtxt<'tcx>,
     local_def_id: LocalDefId,
     t: &'a TokenStream,
-) -> impl Iterator<Item = Place<'tcx>> + 'a {
+) -> impl Iterator<Item = AssignsRange<'tcx>> + 'a {
     let mut it = t.trees().peekable();
     std::iter::from_fn(move || {
         it.peek().is_some().then(|| parse_place(tcx, local_def_id, &mut it, None))
@@ -732,6 +788,7 @@ fn parse_frees_values<'tcx: 'a, 'a>(
         it.peek().is_some().then(|| parse_place(tcx, local_def_id, &mut it, Some("`frees` clause")))
     })
     .filter_map(std::convert::identity)
+    .map(AssignsRange::expect_base_only)
 }
 
 /// Expect the contents of this attribute to be of the format #[attribute =
