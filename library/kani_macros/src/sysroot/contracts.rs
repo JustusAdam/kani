@@ -51,8 +51,8 @@ macro_rules! assert_spanned_err {
 }
 
 use syn::{
-    visit_mut::VisitMut, Attribute, Block, ExprArray, ExprReference, ExprStruct, ExprTuple,
-    FieldValue, FnArg, Pat, Signature, Token,
+    punctuated::Punctuated, visit_mut::VisitMut, Attribute, Block, ExprArray, ExprReference,
+    ExprStruct, ExprTuple, FieldValue, FnArg, Pat, Signature, Token,
 };
 
 /// Hash this `TokenStream` and return an integer that is at most digits
@@ -395,17 +395,19 @@ impl ContractFunctionState {
                     identifier_for_generated_function(item_fn, "replace", a_short_hash);
                 let mut dummy_fn_name =
                     identifier_for_generated_function(item_fn, "replace_dummy", a_short_hash);
+                let mut recursion_wrapper_name =
+                    identifier_for_generated_function(item_fn, "recursion_wrapper", a_short_hash);
 
                 // Constructing string literals explicitly here, because if we call
                 // `stringify!` in the generated code that is passed on as that
                 // expression to the next expansion of a contract, not as the
                 // literal.
-                let check_fn_name_str =
-                    syn::LitStr::new(&check_fn_name.to_string(), Span::call_site());
                 let replace_fn_name_str =
                     syn::LitStr::new(&replace_fn_name.to_string(), Span::call_site());
                 let dummy_fn_name_str =
                     syn::LitStr::new(&dummy_fn_name.to_string(), Span::call_site());
+                let recursion_wrapper_name_str =
+                    syn::LitStr::new(&recursion_wrapper_name.to_string(), Span::call_site());
 
                 // The order of `attrs` and `kanitool::{checked_with,
                 // is_contract_generated}` is important here, because macros are
@@ -426,9 +428,36 @@ impl ContractFunctionState {
                             }
                         ));
                     });
+                    swapped!(&mut item_fn.sig.ident, &mut recursion_wrapper_name, {
+                        let sig = &item_fn.sig;
+                        let args = exprs_for_args(&sig.inputs);
+                        let also_args = args.clone();
+                        let (call_check, call_replace) = if is_probably_impl_fn(sig) {
+                            (quote!(Self::#check_fn_name), quote!(Self::#replace_fn_name))
+                        } else {
+                            (quote!(#check_fn_name), quote!(#replace_fn_name))
+                        };
+                        // This doesn't deal with the case where the inner body
+                        // panics. In that case the boolean does not get reset.
+                        output.extend(quote!(
+                            #[allow(dead_code, unused_variables)]
+                            #[kanitool::is_contract_generated(recursion_wrapper)]
+                            #sig {
+                                static mut REENTRY: bool = false;
+                                if unsafe { REENTRY } {
+                                    #call_replace(#(#args),*)
+                                } else {
+                                    unsafe { REENTRY = true };
+                                    let result = #call_check(#(#also_args),*);
+                                    unsafe { REENTRY = false };
+                                    result
+                                }
+                            }
+                        ));
+                    });
                     output.extend(quote!(
                         #(#attrs)*
-                        #[kanitool::checked_with = #check_fn_name_str]
+                        #[kanitool::checked_with = #recursion_wrapper_name_str]
                         #[kanitool::replaced_with = #replace_fn_name_str]
                         #[kanitool::memory_havoc_dummy = #dummy_fn_name_str]
                         #item_fn
@@ -499,7 +528,7 @@ impl VisitMut for PostconditionInjector {
 /// - Creates new names for them
 /// - Replaces all occurrences of those idents in `attrs` with the new names and
 /// - Returns the mapping of old names to new names
-fn rename_argument_occurences(sig: &syn::Signature, attr: &mut Expr) -> HashMap<Ident, Ident> {
+fn rename_argument_occurrences(sig: &syn::Signature, attr: &mut Expr) -> HashMap<Ident, Ident> {
     let mut arg_ident_collector = ArgumentIdentCollector::new();
     arg_ident_collector.visit_signature(&sig);
 
@@ -542,7 +571,7 @@ impl ContractConditionsType {
         let (old_vars, old_exprs): (Vec<_>, Vec<_>) =
             old_replacer.into_iter_exprs_and_idents().unzip();
 
-        let arg_idents = rename_argument_occurences(sig, attr);
+        let arg_idents = rename_argument_occurrences(sig, attr);
 
         ContractConditionsType::Ensures { old_vars, old_exprs, arg_idents }
     }
@@ -610,13 +639,8 @@ impl<'a> ContractConditionsHandler<'a> {
         let attr = &self.attr;
         let attr_copy = self.attr_copy;
         let call_to_prior = if let Some(dummy) = use_dummy_fn_call {
-            let arg_exprs = sig.inputs.iter().map(|arg| match arg {
-                FnArg::Receiver(_) => Expr::Verbatim(quote!(self)),
-                FnArg::Typed(typed) => pat_to_expr(&typed.pat),
-            });
-            let mut self_detector = SelfDetector(false);
-            self_detector.visit_signature(sig);
-            if self_detector.0 {
+            let arg_exprs = exprs_for_args(&sig.inputs);
+            if is_probably_impl_fn(sig) {
                 quote!(
                     Self::#dummy(#(#arg_exprs),*)
                 )
@@ -646,6 +670,21 @@ impl<'a> ContractConditionsHandler<'a> {
             }
         }
     }
+}
+
+fn is_probably_impl_fn(sig: &Signature) -> bool {
+    let mut self_detector = SelfDetector(false);
+    self_detector.visit_signature(sig);
+    self_detector.0
+}
+
+fn exprs_for_args<'a, T>(
+    args: &'a Punctuated<FnArg, T>,
+) -> impl Iterator<Item = Expr> + Clone + 'a {
+    args.iter().map(|arg| match arg {
+        FnArg::Receiver(_) => Expr::Verbatim(quote!(self)),
+        FnArg::Typed(typed) => pat_to_expr(&typed.pat),
+    })
 }
 
 struct SelfDetector(bool);
