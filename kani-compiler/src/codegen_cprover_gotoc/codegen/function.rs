@@ -4,12 +4,12 @@
 //! This file contains functions related to codegenning MIR functions into gotoc
 
 use crate::codegen_cprover_gotoc::GotocCtx;
-use crate::kani_middle::attributes::AssignsRange;
+use crate::kani_middle::attributes::{AssignablePlace, AssignsRange, LocalOrGlobalVar};
 use crate::kani_middle::contracts::GFnContract;
 use cbmc::goto_program::{Expr, FunctionContract, Lambda, Stmt, Symbol, Type};
 use cbmc::InternString;
 use rustc_middle::mir::traversal::reverse_postorder;
-use rustc_middle::mir::{Body, HasLocalDecls, Local, Place};
+use rustc_middle::mir::{self, Body, HasLocalDecls, Local};
 use rustc_middle::ty::{self, Instance};
 use std::collections::BTreeMap;
 use std::iter::FromIterator;
@@ -224,6 +224,40 @@ impl<'tcx> GotocCtx<'tcx> {
         );
     }
 
+    fn codegen_assignable_place(&mut self, place: AssignablePlace<'tcx>) -> Expr {
+        let projection = place.projections;
+        match place.base {
+            LocalOrGlobalVar::Local(local) => {
+                self.codegen_place(&mir::Place { local, projection }).unwrap().goto_expr
+            }
+            LocalOrGlobalVar::Global(def_id) => {
+                self.codegen_static_alloc_sym(def_id, false).to_expr()
+            }
+        }
+    }
+
+    fn codegen_assigns_range(&mut self, range: AssignsRange<'tcx>) -> Expr {
+        use cbmc::goto_program::MemoryTarget;
+        let ptr = self.codegen_assignable_place(range.base());
+        if let Some(slc) = range.slice() {
+            let target = if let Some(to) = slc.to() {
+                let base = if let Some(from) = slc.from() {
+                    ptr.plus(self.codegen_assignable_place(from))
+                } else {
+                    ptr
+                };
+                MemoryTarget::ObjectUpto(base, self.codegen_assignable_place(to))
+            } else if let Some(from) = slc.from() {
+                MemoryTarget::ObjectFrom(ptr.plus(self.codegen_assignable_place(from)))
+            } else {
+                MemoryTarget::ObjectWhole(ptr)
+            };
+            Expr::unconditional_target_group(target)
+        } else {
+            ptr
+        }
+    }
+
     /// Convert the Kani level contract into a CBMC level contract by creating a
     /// lambda that calls the contract implementation function.
     ///
@@ -251,11 +285,8 @@ impl<'tcx> GotocCtx<'tcx> {
     #[cfg(not(feature = "inlined-goto-contracts"))]
     fn as_goto_contract(
         &mut self,
-        fn_contract: &GFnContract<Instance<'tcx>, AssignsRange<'tcx>, Place<'tcx>>,
+        fn_contract: &GFnContract<Instance<'tcx>, AssignsRange<'tcx>, AssignablePlace<'tcx>>,
     ) -> FunctionContract {
-        use cbmc::goto_program::MemoryTarget;
-        use rustc_middle::mir;
-
         let goto_annotated_fn_name = self.current_fn().name();
         let goto_annotated_fn_typ = self
             .symbol_table
@@ -313,30 +344,7 @@ impl<'tcx> GotocCtx<'tcx> {
             clauses
                 .iter()
                 .map(|lval| {
-                    let ptr = slf.codegen_place(&lval.base()).unwrap().goto_expr;
-                    let body = if let Some(slc) = lval.slice() {
-                        let target = match slc {
-                            (None, None) => MemoryTarget::ObjectWhole(ptr),
-                            (Some(from), None) => MemoryTarget::ObjectFrom(
-                                ptr.plus(slf.codegen_place(&from).unwrap().goto_expr),
-                            ),
-                            (frm, Some(to)) => {
-                                let base = if let Some(from) = frm {
-                                    ptr.plus(slf.codegen_place(&from).unwrap().goto_expr)
-                                } else {
-                                    ptr
-                                };
-                                MemoryTarget::ObjectUpto(
-                                    base,
-                                    slf.codegen_place(&to).unwrap().goto_expr,
-                                )
-                            }
-                        };
-
-                        Expr::unconditional_target_group(target)
-                    } else {
-                        ptr
-                    };
+                    let body = slf.codegen_assigns_range(*lval);
                     Lambda::as_contract_for(&goto_annotated_fn_typ, None, body)
                 })
                 .collect()
@@ -358,11 +366,11 @@ impl<'tcx> GotocCtx<'tcx> {
         let frees = fn_contract
             .frees()
             .iter()
-            .map(|lval| {
+            .map(|&lval| {
                 Lambda::as_contract_for(
                     &goto_annotated_fn_typ,
                     None,
-                    self.codegen_place(&lval).unwrap().goto_expr,
+                    self.codegen_assignable_place(lval),
                 )
             })
             .collect();
@@ -455,7 +463,7 @@ impl<'tcx> GotocCtx<'tcx> {
     pub fn attach_contract(
         &mut self,
         instance: Instance<'tcx>,
-        contract: &GFnContract<Instance<'tcx>, AssignsRange<'tcx>, Place<'tcx>>,
+        contract: &GFnContract<Instance<'tcx>, AssignsRange<'tcx>, AssignablePlace<'tcx>>,
     ) {
         // This should be safe, since the contract is pretty much evaluated as
         // though it was the first (or last) assertion in the function.

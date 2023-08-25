@@ -503,9 +503,13 @@ impl<'tcx> GotocCtx<'tcx> {
     ///
     /// These are not initialized here, see `codegen_static`.
     pub fn codegen_static_pointer(&mut self, def_id: DefId, is_thread_local: bool) -> Expr {
+        self.codegen_static_alloc_sym(def_id, is_thread_local).to_expr().address_of()
+    }
+
+    pub fn codegen_static_alloc_sym(&mut self, def_id: DefId, is_thread_local: bool) -> &Symbol {
         let instance = Instance::mono(self.tcx, def_id);
 
-        let sym = self.ensure(&self.symbol_name(instance), |ctx, name| {
+        self.ensure(&self.symbol_name(instance), |ctx, name| {
             // Rust has a notion of "extern static" variables. These are in an "extern" block,
             // and so aren't initialized in the current codegen unit. For example (from std):
             //      extern "C" {
@@ -532,8 +536,7 @@ impl<'tcx> GotocCtx<'tcx> {
             )
             .with_is_extern(is_extern)
             .with_is_thread_local(is_thread_local)
-        });
-        sym.clone().to_expr().address_of()
+        })
     }
 
     /// Generate an expression that represents the address for a constant allocation.

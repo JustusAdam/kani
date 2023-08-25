@@ -52,7 +52,7 @@ pub fn resolve_fn<'tcx>(
 /// paths.
 ///
 /// Note: This function was written to be generic, however, it has only been tested for functions.
-fn resolve_path<'tcx>(
+pub fn resolve_path<'tcx>(
     tcx: TyCtxt<'tcx>,
     current_module: LocalDefId,
     path_str: &str,
@@ -60,21 +60,65 @@ fn resolve_path<'tcx>(
     let _span = tracing::span!(tracing::Level::DEBUG, "path_resolution").entered();
 
     let path = resolve_prefix(tcx, current_module, path_str)?;
-    path.segments.into_iter().try_fold(path.base, |base, name| {
+    debug!(?path);
+    path.segments
+        .into_iter()
+        .try_fold(ResolveStep { base_mod_like: path.base, item_zoom: None }, |step, name| {
+            step.next(tcx, name)
+        })
+        .map(ResolveStep::get_resolved)
+}
+
+#[derive(Debug)]
+struct ResolveStep {
+    base_mod_like: DefId,
+    item_zoom: Option<(DefId, String)>,
+}
+
+impl ResolveStep {
+    fn next<'tcx>(self, tcx: TyCtxt<'tcx>, name: String) -> Result<Self, ResolveError<'tcx>> {
+        debug!(?self);
+        let Self { base_mod_like: base, item_zoom } = self;
+        let name = if let Some((_, mut partial_path)) = item_zoom {
+            partial_path.push_str("::");
+            partial_path.push_str(&name);
+            partial_path
+        } else {
+            name
+        };
         debug!(?base, ?name, "resolve_path");
         let def_kind = tcx.def_kind(base);
         let next_item = match def_kind {
             DefKind::ForeignMod | DefKind::Mod => resolve_in_module(tcx, base, &name),
             DefKind::Struct | DefKind::Enum | DefKind::Union => resolve_in_type(tcx, base, &name),
+            DefKind::Fn => {
+                return Self {
+                    base_mod_like: DefId { index: CRATE_DEF_INDEX, krate: LOCAL_CRATE },
+                    item_zoom: Some((base, tcx.item_name(base).to_string())),
+                }
+                .next(tcx, name);
+            }
             kind => {
                 debug!(?base, ?kind, "resolve_path: unexpected item");
                 Err(ResolveError::UnexpectedType { tcx, item: base, expected: "module" })
             }
+        }?;
+        let new = if matches!(
+            tcx.def_kind(next_item),
+            DefKind::ForeignMod | DefKind::Mod | DefKind::Struct | DefKind::Enum | DefKind::Union
+        ) {
+            Self { base_mod_like: next_item, item_zoom: None }
+        } else {
+            Self { base_mod_like: base, item_zoom: Some((next_item, name)) }
         };
-        next_item
-    })
-}
+        debug!(?new);
+        Ok(new)
+    }
 
+    fn get_resolved(self) -> DefId {
+        self.item_zoom.map_or(self.base_mod_like, |i| i.0)
+    }
+}
 /// Provide information about where the resolution failed.
 /// Todo: Add error message.
 pub enum ResolveError<'tcx> {

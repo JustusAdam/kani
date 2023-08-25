@@ -19,8 +19,8 @@ use rustc_hir::{
     def_id::{DefId, LocalDefId},
 };
 use rustc_middle::{
-    mir::{Place, PlaceElem, ProjectionElem},
-    ty::{Instance, TyCtxt, TyKind},
+    mir::{tcx::PlaceTy, HasLocalDecls, Local, PlaceElem, ProjectionElem},
+    ty::{self, Instance, ParamEnv, TyCtxt, TyKind},
 };
 use rustc_session::Session;
 use rustc_span::{Span, Symbol};
@@ -56,6 +56,7 @@ enum KaniAttributeKind {
     /// Attribute on a function that was auto-generated from expanding a
     /// function contract.
     IsContractGenerated,
+    ReentryVar,
 }
 
 impl KaniAttributeKind {
@@ -75,6 +76,7 @@ impl KaniAttributeKind {
             | KaniAttributeKind::ReplacedWith
             | KaniAttributeKind::CheckedWith
             | KaniAttributeKind::MemoryHavocDummy
+            | KaniAttributeKind::ReentryVar
             | KaniAttributeKind::IsContractGenerated => false,
         }
     }
@@ -198,10 +200,15 @@ impl<'tcx> KaniAttributes<'tcx> {
         })
     }
 
-    /// Extact the name of the sibling function this contract is checked with
+    /// Extract the name of the sibling function this contract is checked with
     /// (if any)
     pub fn checked_with(&self) -> Option<Symbol> {
         self.expect_maybe_one(KaniAttributeKind::CheckedWith)
+            .map(|target| expect_key_string_value(self.tcx.sess, target))
+    }
+
+    pub fn reentry_var(&self) -> Option<Symbol> {
+        self.expect_maybe_one(KaniAttributeKind::ReentryVar)
             .map(|target| expect_key_string_value(self.tcx.sess, target))
     }
 
@@ -231,7 +238,7 @@ impl<'tcx> KaniAttributes<'tcx> {
                 other => panic!("Odd parent item kind {other:?}"),
             },
             Node::Crate(m) => find_in_mod(m),
-            other => panic!("Odd prant node type {other:?}"),
+            other => panic!("Odd parent node type {other:?}"),
         }
         .expect_owner()
         .def_id
@@ -296,6 +303,7 @@ impl<'tcx> KaniAttributes<'tcx> {
                 KaniAttributeKind::StubVerified => {}
                 KaniAttributeKind::CheckedWith
                 | KaniAttributeKind::ReplacedWith
+                | KaniAttributeKind::ReentryVar
                 | KaniAttributeKind::MemoryHavocDummy => {
                     self.expect_maybe_one(kind)
                         .map(|attr| expect_key_string_value(&self.tcx.sess, attr));
@@ -417,6 +425,7 @@ impl<'tcx> KaniAttributes<'tcx> {
                     | KaniAttributeKind::Assigns
                     | KaniAttributeKind::Frees
                     | KaniAttributeKind::MemoryHavocDummy
+                    | KaniAttributeKind::ReentryVar
                     | KaniAttributeKind::ReplacedWith => {
                         todo!("Contract attributes are not supported on proofs")
                     }
@@ -493,7 +502,7 @@ impl<'tcx> KaniAttributes<'tcx> {
         })
     }
 
-    pub fn frees_contract(&self) -> Option<Vec<Place<'tcx>>> {
+    pub fn frees_contract(&self) -> Option<Vec<AssignablePlace<'tcx>>> {
         let local_def_id = self.item.expect_local();
         self.map.get(&KaniAttributeKind::Frees).map(|attr| {
             attr.iter()
@@ -548,13 +557,107 @@ pub fn test_harness_name(tcx: TyCtxt, def_id: DefId) -> String {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
+pub struct SliceSpec<'tcx> {
+    from: Option<AssignablePlace<'tcx>>,
+    to: Option<AssignablePlace<'tcx>>,
+}
+
+impl<'tcx> SliceSpec<'tcx> {
+    pub fn from(self) -> Option<AssignablePlace<'tcx>> {
+        self.from
+    }
+
+    pub fn to(self) -> Option<AssignablePlace<'tcx>> {
+        self.to
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct AssignsRange<'tcx> {
-    base: Place<'tcx>,
-    slice: Option<(Option<Place<'tcx>>, Option<Place<'tcx>>)>,
+    base: AssignablePlace<'tcx>,
+    slice: Option<SliceSpec<'tcx>>,
+}
+
+impl<'tcx> From<Local> for AssignsRange<'tcx> {
+    fn from(value: Local) -> Self {
+        AssignsRange { base: value.into(), slice: None }
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+pub enum LocalOrGlobalVar {
+    Local(Local),
+    Global(DefId),
+}
+
+impl From<Local> for LocalOrGlobalVar {
+    fn from(value: Local) -> Self {
+        LocalOrGlobalVar::Local(value)
+    }
+}
+
+impl From<DefId> for LocalOrGlobalVar {
+    fn from(value: DefId) -> Self {
+        LocalOrGlobalVar::Global(value.into())
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+pub struct AssignablePlace<'tcx> {
+    pub base: LocalOrGlobalVar,
+    pub projections: &'tcx ty::List<PlaceElem<'tcx>>,
+}
+
+impl<'tcx> AssignablePlace<'tcx> {
+    /// basically a copy of rustc::middle::mir::Place::ty_from
+    pub fn ty<D: HasLocalDecls<'tcx> + ?Sized>(
+        &self,
+        local_decls: &D,
+        tcx: TyCtxt<'tcx>,
+        args: ty::GenericArgsRef<'tcx>,
+    ) -> PlaceTy<'tcx> {
+        let param_env = ParamEnv::reveal_all();
+        self.projections.iter().fold(
+            PlaceTy::from_ty(match self.base {
+                LocalOrGlobalVar::Local(l) => local_decls.local_decls()[l].ty,
+                LocalOrGlobalVar::Global(def_id) => Instance::resolve(tcx, param_env, def_id, args)
+                    .unwrap()
+                    .unwrap()
+                    .ty(tcx, param_env),
+            }),
+            |place_ty, elem| place_ty.projection_ty(tcx, elem),
+        )
+    }
+
+    pub fn from_no_projections(base: LocalOrGlobalVar) -> Self {
+        Self { base, projections: ty::List::empty() }
+    }
+}
+
+impl<'tcx> From<Local> for AssignablePlace<'tcx> {
+    fn from(value: Local) -> Self {
+        Self::from_no_projections(value.into())
+    }
+}
+
+impl<'tcx> From<DefId> for AssignablePlace<'tcx> {
+    fn from(value: DefId) -> Self {
+        Self::from_no_projections(value.into())
+    }
+}
+
+impl<'tcx> AssignablePlace<'tcx> {
+    fn project_deeper(mut self, more_projections: &[PlaceElem<'tcx>], tcx: TyCtxt<'tcx>) -> Self {
+        let Self { base: _, projections } = &mut self;
+        let mut v = projections.to_vec();
+        v.extend(more_projections);
+        *projections = tcx.mk_place_elems(&v);
+        self
+    }
 }
 
 impl<'tcx> AssignsRange<'tcx> {
-    fn expect_base_only(self) -> Place<'tcx> {
+    fn expect_base_only(self) -> AssignablePlace<'tcx> {
         assert!(self.slice.is_none());
         self.base
     }
@@ -564,12 +667,28 @@ impl<'tcx> AssignsRange<'tcx> {
         self
     }
 
-    pub fn base(self) -> Place<'tcx> {
+    pub fn base(self) -> AssignablePlace<'tcx> {
         self.base
     }
 
-    pub fn slice(self) -> Option<(Option<Place<'tcx>>, Option<Place<'tcx>>)> {
+    pub fn slice(self) -> Option<SliceSpec<'tcx>> {
         self.slice
+    }
+
+    pub fn from_no_slice(base: AssignablePlace<'tcx>) -> Self {
+        Self { base, slice: None }
+    }
+}
+
+impl<'tcx> From<AssignablePlace<'tcx>> for AssignsRange<'tcx> {
+    fn from(value: AssignablePlace<'tcx>) -> Self {
+        Self::from_no_slice(value)
+    }
+}
+
+impl<'tcx> From<DefId> for AssignsRange<'tcx> {
+    fn from(value: DefId) -> Self {
+        Self::from_no_slice(value.into())
     }
 }
 
@@ -664,7 +783,7 @@ fn parse_place<'tcx, 'b, I: Iterator<Item = &'b TokenTree>>(
                         .find(|(name, _decl)| name.name == *id)
                         .unwrap()
                         .1;
-                    AssignsRange { base: Place::from(local), slice: None }
+                    AssignsRange::from(local)
                 }
                 TokenKind::BinOp(BinOpToken::Star) => {
                     let Some(res) = parse_place(tcx, local_def_id, t, deny_wildcard_subslice)
@@ -694,7 +813,8 @@ fn parse_place<'tcx, 'b, I: Iterator<Item = &'b TokenTree>>(
                                 _,
                             ),
                         ) => {
-                            let pty = base.expect_base_only().ty(local_decls, tcx);
+                            let pty =
+                                base.expect_base_only().ty(local_decls, tcx, ty::List::empty());
                             let (adt_def, _) = match pty.ty.kind() {
                                 TyKind::Adt(adt, substs) => (adt, substs),
                                 _ => panic!(),
@@ -751,7 +871,7 @@ fn parse_place<'tcx, 'b, I: Iterator<Item = &'b TokenTree>>(
                     }
                     return Some(AssignsRange {
                         base: base.expect_base_only(),
-                        slice: Some((from, to)),
+                        slice: Some(SliceSpec { from, to }),
                     });
                 }
                 tok => tcx.sess.span_fatal(
@@ -782,7 +902,7 @@ fn parse_frees_values<'tcx: 'a, 'a>(
     tcx: TyCtxt<'tcx>,
     local_def_id: LocalDefId,
     t: &'a TokenStream,
-) -> impl Iterator<Item = Place<'tcx>> + 'a {
+) -> impl Iterator<Item = AssignablePlace<'tcx>> + 'a {
     let mut it = t.trees().peekable();
     std::iter::from_fn(move || {
         it.peek().is_some().then(|| parse_place(tcx, local_def_id, &mut it, Some("`frees` clause")))
