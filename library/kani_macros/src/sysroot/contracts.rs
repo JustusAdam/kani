@@ -397,9 +397,9 @@ impl ContractFunctionState {
                     identifier_for_generated_function(item_fn, "replace_dummy", a_short_hash);
                 let mut recursion_wrapper_name =
                     identifier_for_generated_function(item_fn, "recursion_wrapper", a_short_hash);
-
                 let reentry_ident =
                     identifier_for_generated_function(item_fn, "reentry_var", a_short_hash);
+
                 // Constructing string literals explicitly here, because if we call
                 // `stringify!` in the generated code that is passed on as that
                 // expression to the next expansion of a contract, not as the
@@ -412,6 +412,8 @@ impl ContractFunctionState {
                     syn::LitStr::new(&recursion_wrapper_name.to_string(), Span::call_site());
                 let reentry_ident_str =
                     syn::LitStr::new(&reentry_ident.to_string(), Span::call_site());
+                let check_fn_name_str =
+                    syn::LitStr::new(&check_fn_name.to_string(), Span::call_site());
 
                 // The order of `attrs` and `kanitool::{checked_with,
                 // is_contract_generated}` is important here, because macros are
@@ -444,10 +446,10 @@ impl ContractFunctionState {
                         // This doesn't deal with the case where the inner body
                         // panics. In that case the boolean does not get reset.
                         output.extend(quote!(
+                            static mut #reentry_ident: bool = false;
                             #[allow(dead_code, unused_variables)]
                             #[kanitool::is_contract_generated(recursion_wrapper)]
                             #sig {
-                                static mut #reentry_ident: bool = false;
                                 if unsafe { #reentry_ident } {
                                     #call_replace(#(#args),*)
                                 } else {
@@ -462,6 +464,7 @@ impl ContractFunctionState {
                     output.extend(quote!(
                         #(#attrs)*
                         #[kanitool::checked_with = #recursion_wrapper_name_str]
+                        #[kanitool::inner_check = #check_fn_name_str]
                         #[kanitool::replaced_with = #replace_fn_name_str]
                         #[kanitool::memory_havoc_dummy = #dummy_fn_name_str]
                         #[kanitool::reentry_var = #reentry_ident_str]

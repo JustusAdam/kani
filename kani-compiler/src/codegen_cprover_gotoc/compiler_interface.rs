@@ -5,7 +5,7 @@
 
 use crate::codegen_cprover_gotoc::GotocCtx;
 use crate::kani_middle::attributes::{
-    is_test_harness_description, AssignablePlace, KaniAttributes,
+    is_test_harness_description, KaniAttributes,
 };
 use crate::kani_middle::contracts::GFnContract;
 use crate::kani_middle::metadata::gen_test_metadata;
@@ -13,7 +13,6 @@ use crate::kani_middle::provide;
 use crate::kani_middle::reachability::{
     collect_reachable_items, filter_const_crate_items, filter_crate_items,
 };
-use crate::kani_middle::resolve::resolve_path;
 use crate::kani_middle::{analysis, attributes};
 use crate::kani_middle::{check_reachable_items, dump_mir_items};
 use crate::kani_queries::{QueryDb, ReachabilityType};
@@ -35,14 +34,12 @@ use rustc_data_structures::fx::FxHashSet;
 use rustc_data_structures::fx::{FxHashMap, FxIndexMap};
 use rustc_data_structures::temp_dir::MaybeTempDir;
 use rustc_errors::{ErrorGuaranteed, DEFAULT_LOCALE_RESOURCE};
-use rustc_hir::def::DefKind;
 use rustc_hir::def_id::{DefId, LOCAL_CRATE};
 use rustc_hir::definitions::DefPathHash;
 use rustc_metadata::fs::{emit_wrapper_file, METADATA_FILENAME};
 use rustc_metadata::EncodedMetadata;
 use rustc_middle::dep_graph::{WorkProduct, WorkProductId};
 use rustc_middle::mir::mono::MonoItem;
-use rustc_middle::mir::ProjectionElem;
 use rustc_middle::query::{ExternProviders, Providers};
 use rustc_middle::ty::{Instance, InstanceDef, ParamEnv, TyCtxt};
 use rustc_session::config::{CrateType, OutputFilenames, OutputType};
@@ -159,60 +156,70 @@ impl GotocCodegenBackend {
                 // declared and created before since we rip out the
                 // implementation from the contract function
                 let mut contract_info = SerializableContractMetadata::default();
+                if std::env::var("KANI_NO_ASSIGNS").is_ok() {
+                    return contract_info;
+                }
                 for item in &items {
                     if let MonoItem::Fn(instance @ Instance { def: InstanceDef::Item(did), .. }) =
                         item
                     {
-                        if let Some(is_replace) = (contract_metadata.check_contract == Some(*did))
-                            .then_some(false)
-                            .or(contract_metadata.replace_contracts.contains(did).then_some(true))
+                        if let Some(is_check) = (contract_metadata.check_contract == Some(*did))
+                            .then_some(true)
+                            .or(contract_metadata.replace_contracts.contains(did).then_some(false))
                         {
                             let attrs = KaniAttributes::for_item(tcx, *did);
-                            let mut assigns_contract =
+                            let assigns_contract =
                                 attrs.assigns_contract().unwrap_or_else(Vec::new);
+                            
+                            // use crate::kani_middle::attributes::AssignablePlace;
+                            // use crate::kani_middle::resolve::resolve_path;
+                            // use rustc_hir::def::DefKind;
+                            // use rustc_middle::mir::ProjectionElem;
 
-                            let recursion_tracker = resolve_path(
-                                tcx,
-                                tcx.parent_module_from_def_id(did.expect_local()),
-                                attrs.reentry_var().unwrap().as_str(),
-                            )
-                            .unwrap();
-                            assert_eq!(
-                                tcx.def_kind(recursion_tracker),
-                                DefKind::Static(rustc_ast::Mutability::Mut),
-                                "{}",
-                                tcx.def_path_debug_str(recursion_tracker)
-                            );
+                            // let recursion_tracker = resolve_path(
+                            //     tcx,
+                            //     tcx.parent_module_from_def_id(did.expect_local()),
+                            //     attrs.reentry_var().unwrap().as_str(),
+                            // )
+                            // .unwrap();
+                            // assert_eq!(
+                            //     tcx.def_kind(recursion_tracker),
+                            //     DefKind::Static(rustc_ast::Mutability::Mut),
+                            //     "{}",
+                            //     tcx.def_path_debug_str(recursion_tracker)
+                            // );
 
-                            assigns_contract.push(
-                                AssignablePlace {
-                                    base: recursion_tracker.into(),
-                                    projections: tcx.mk_place_elems(&[ProjectionElem::Deref]),
-                                }
-                                .into(),
-                            );
+                            // assigns_contract.push(
+                            //     AssignablePlace {
+                            //         base: recursion_tracker.into(),
+                            //         projections: tcx.mk_place_elems(&[ProjectionElem::Deref]),
+                            //     }
+                            //     .into(),
+                            // );
 
                             let frees_contract = attrs.frees_contract().unwrap_or_else(Vec::new);
-                            let enforcement_target = if is_replace {
-                                let did = attrs.memory_havoc_dummy().unwrap();
+                            let get_instance = |did| 
                                 Instance::expect_resolve(
                                     tcx,
                                     ParamEnv::reveal_all(),
                                     did,
                                     instance.args,
-                                )
-                            } else {
-                                *instance
-                            };
-                            gcx.attach_contract(
-                                enforcement_target,
-                                &GFnContract::new(vec![], vec![], assigns_contract, frees_contract),
-                            );
-                            let name = tcx.symbol_name(enforcement_target).to_string();
-                            if is_replace {
-                                contract_info.replace_contracts.push(name);
-                            } else {
-                                assert!(contract_info.check_contract.replace(name).is_none());
+                                );
+                            let gcx = &mut gcx;
+                            let mut attach_contract = |target| 
+                                gcx.attach_contract(
+                                    target,
+                                    &GFnContract::new(vec![], vec![], assigns_contract.clone(), frees_contract.clone()),
+                                );
+                            let name_for_inst = |inst| tcx.symbol_name(inst).to_string();
+
+                            let mem_dummy_inst = get_instance(attrs.memory_havoc_dummy().unwrap());
+                            attach_contract(mem_dummy_inst);
+                            contract_info.replace_contracts.push(name_for_inst(mem_dummy_inst));
+                            if is_check {
+                                let inner_check_inst = get_instance(attrs.memory_havoc_dummy().unwrap());
+                                attach_contract(inner_check_inst);
+                                assert!(contract_info.check_contract.replace(name_for_inst(inner_check_inst)).is_none());
                             }
                         }
                     }
@@ -223,7 +230,7 @@ impl GotocCodegenBackend {
                 );
                 assert!(
                     contract_info.replace_contracts.len()
-                        <= contract_metadata.replace_contracts.len()
+                        <= contract_metadata.replace_contracts.len() + 1
                 );
                 contract_info
             },

@@ -57,6 +57,7 @@ enum KaniAttributeKind {
     /// function contract.
     IsContractGenerated,
     ReentryVar,
+    InnerCheck,
 }
 
 impl KaniAttributeKind {
@@ -77,6 +78,7 @@ impl KaniAttributeKind {
             | KaniAttributeKind::CheckedWith
             | KaniAttributeKind::MemoryHavocDummy
             | KaniAttributeKind::ReentryVar
+            | KaniAttributeKind::InnerCheck
             | KaniAttributeKind::IsContractGenerated => false,
         }
     }
@@ -93,7 +95,7 @@ impl KaniAttributeKind {
     /// contract. E.g. created by `requires`, `ensures`
     pub fn is_function_contract(self) -> bool {
         use KaniAttributeKind::*;
-        matches!(self, CheckedWith | ReplacedWith | IsContractGenerated)
+        matches!(self, CheckedWith | ReplacedWith | IsContractGenerated | InnerCheck)
     }
 }
 
@@ -207,9 +209,15 @@ impl<'tcx> KaniAttributes<'tcx> {
             .map(|target| expect_key_string_value(self.tcx.sess, target))
     }
 
+    #[allow(dead_code)]
     pub fn reentry_var(&self) -> Option<Symbol> {
         self.expect_maybe_one(KaniAttributeKind::ReentryVar)
             .map(|target| expect_key_string_value(self.tcx.sess, target))
+    }
+
+    #[allow(dead_code)]
+    pub fn inner_check(&self) -> Option<DefId> {
+        self.eval_sibling_attribute(KaniAttributeKind::InnerCheck)
     }
 
     pub fn replaced_with(&self) -> Option<Symbol> {
@@ -217,10 +225,15 @@ impl<'tcx> KaniAttributes<'tcx> {
             .map(|target| expect_key_string_value(self.tcx.sess, target))
     }
 
+    #[allow(dead_code)]
     pub fn memory_havoc_dummy(&self) -> Option<DefId> {
+        self.eval_sibling_attribute(KaniAttributeKind::MemoryHavocDummy)
+    }
+
+    fn eval_sibling_attribute(&self, kind: KaniAttributeKind) -> Option<DefId> {
         use rustc_hir::{Item, ItemKind, Mod, Node};
         let name = self
-            .expect_maybe_one(KaniAttributeKind::MemoryHavocDummy)
+            .expect_maybe_one(kind)
             .map(|target| expect_key_string_value(self.tcx.sess, target))?;
 
         let hir_map = self.tcx.hir();
@@ -304,6 +317,7 @@ impl<'tcx> KaniAttributes<'tcx> {
                 KaniAttributeKind::CheckedWith
                 | KaniAttributeKind::ReplacedWith
                 | KaniAttributeKind::ReentryVar
+                | KaniAttributeKind::InnerCheck
                 | KaniAttributeKind::MemoryHavocDummy => {
                     self.expect_maybe_one(kind)
                         .map(|attr| expect_key_string_value(&self.tcx.sess, attr));
@@ -426,6 +440,7 @@ impl<'tcx> KaniAttributes<'tcx> {
                     | KaniAttributeKind::Frees
                     | KaniAttributeKind::MemoryHavocDummy
                     | KaniAttributeKind::ReentryVar
+                    | KaniAttributeKind::InnerCheck
                     | KaniAttributeKind::ReplacedWith => {
                         todo!("Contract attributes are not supported on proofs")
                     }
@@ -464,6 +479,7 @@ impl<'tcx> KaniAttributes<'tcx> {
                         || replace_str.to_string(),
                         |t| t.0.to_string() + "::" + replace_str,
                     );
+                    println!("Replacing {original} with contract {replacement}");
                     resolve::resolve_fn(self.tcx, current_module, &replacement).unwrap();
                     Stub { original: original_str.to_string(), replacement }
                 }),

@@ -183,8 +183,11 @@ impl KaniSession {
             return Ok(());
         }
 
-        let mut args: Vec<std::ffi::OsString> =
-            vec!["--dfcc".into(), (&harness.mangled_name).into()];
+        let mut args: Vec<std::ffi::OsString> = if std::env::var("KANI_NO_DFCC").is_ok() {
+            vec![]
+        } else {
+            vec!["--dfcc".into(), (&harness.mangled_name).into()]
+        };
 
         if let Some(function) = check {
             println!("enforcing function contract for {function}");
@@ -192,6 +195,7 @@ impl KaniSession {
         }
 
         for repl in replace {
+            println!("Replacing function contract for {repl}");
             args.extend(["--replace-call-with-contract".into(), repl.into()]);
         }
 
