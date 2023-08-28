@@ -959,4 +959,50 @@ pub fn proof_for_contract(attr: TokenStream, item: TokenStream) -> TokenStream {
     .into()
 }
 
+pub fn auto_contract_proof(attr: TokenStream, item: TokenStream) -> TokenStream {
+    assert!(attr.is_empty());
+    let item_fn: &ItemFn = &parse_macro_input!(item);
+
+    fn mk_ref(mutability: Option<syn::token::Mut>, inner: Expr) -> Expr {
+        Expr::Reference(ExprReference {
+            attrs: vec![],
+            and_token: Token!(&)(Span::call_site()),
+            mutability,
+            expr: Box::new(inner),
+        })
+    }
+
+    fn any_for_type(ty: &syn::Type) -> Expr {
+        match ty {
+            syn::Type::Reference(tyref) => mk_ref(tyref.mutability, any_for_type(&tyref.elem)),
+            _other => Expr::Verbatim(quote!(kani::any())),
+        }
+    }
+
+    let is_probably_impl = is_probably_impl_fn(&item_fn.sig);
+    let item_name = &item_fn.sig.ident;
+    let harness_name =
+        Ident::new(&format!("{}_auto_harness", item_name.to_string()), Span::call_site());
+    let mut arbitrary = item_fn.sig.inputs.iter().map(|arg| match arg {
+        FnArg::Receiver(rc) => mk_ref(rc.mutability, any_for_type(&rc.ty)),
+        FnArg::Typed(tp) => any_for_type(&tp.ty),
+    });
+    let call = if is_probably_impl {
+        let slf = arbitrary.next().unwrap();
+        quote!(#slf.#item_name(#(#arbitrary),*))
+    } else {
+        quote!(#item_name(#(#arbitrary),*))
+    };
+
+    quote!(
+        #[kani::proof_for_contract(#item_name)]
+        fn #harness_name() {
+            let _ = #call;
+        }
+
+        #item_fn
+    )
+    .into()
+}
+
 passthrough!(stub_verified, false);
