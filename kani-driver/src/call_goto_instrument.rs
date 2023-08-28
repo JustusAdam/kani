@@ -183,15 +183,17 @@ impl KaniSession {
             return Ok(());
         }
 
-        let mut args: Vec<std::ffi::OsString> = if std::env::var("KANI_NO_DFCC").is_ok() {
-            vec![]
-        } else {
-            vec!["--dfcc".into(), (&harness.mangled_name).into()]
-        };
+        let use_dfcc = std::env::var("KANI_NO_DFCC").is_err();
 
-        if let Some(function) = check {
+        let mut args: Vec<std::ffi::OsString> =
+            if use_dfcc { vec!["--dfcc".into(), (&harness.mangled_name).into()] } else { vec![] };
+
+        if let Some((function, recursion_tracker)) = check {
             println!("enforcing function contract for {function}");
             args.extend(["--enforce-contract".into(), function.into()]);
+            if use_dfcc {
+                args.extend(["--nondet-static-exclude".into(), recursion_tracker.into()]);
+            }
         }
 
         for repl in replace {

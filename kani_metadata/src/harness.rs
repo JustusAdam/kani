@@ -17,7 +17,7 @@ impl<Check, Replace: Default> Default for ContractMetadata<Check, Replace> {
     }
 }
 
-pub type SerializableContractMetadata = ContractMetadata<String, Vec<String>>;
+pub type SerializableContractMetadata = ContractMetadata<(String, String), Vec<String>>;
 
 /// We emit this structure for each annotated proof harness (`#[kani::proof]`) we find.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

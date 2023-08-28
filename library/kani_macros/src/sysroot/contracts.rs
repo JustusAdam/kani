@@ -430,7 +430,7 @@ impl ContractFunctionState {
                         output.extend(quote!(
                             #[allow(dead_code, unused_variables)]
                             #sig {
-                                unreachable!()
+                                kani::any()
                             }
                         ));
                     });
@@ -931,5 +931,32 @@ macro_rules! passthrough {
     }
 }
 
-passthrough!(proof_for_contract, true);
+pub fn proof_for_contract(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let args = proc_macro2::TokenStream::from(attr);
+    let mut fn_item: ItemFn = parse_macro_input!(item);
+    fn_item.block.stmts.insert(
+        0,
+        syn::Stmt::Local(syn::Local {
+            attrs: vec![],
+            let_token: Token!(let)(Span::call_site()),
+            pat: Pat::Wild(syn::PatWild {
+                attrs: vec![],
+                underscore_token: Token!(_)(Span::call_site()),
+            }),
+            init: Some(syn::LocalInit {
+                eq_token: Token!(=)(Span::call_site()),
+                expr: Box::new(Expr::Verbatim(quote!(std::boxed::Box::new(0_usize)))),
+                diverge: None,
+            }),
+            semi_token: Token!(;)(Span::call_site()),
+        }),
+    );
+    quote!(
+        #[allow(dead_code)]
+        #[kanitool::proof_for_contract = stringify!(#args)]
+        #fn_item
+    )
+    .into()
+}
+
 passthrough!(stub_verified, false);

@@ -4,9 +4,7 @@
 //! This file contains the code necessary to interface with the compiler backend
 
 use crate::codegen_cprover_gotoc::GotocCtx;
-use crate::kani_middle::attributes::{
-    is_test_harness_description, KaniAttributes,
-};
+use crate::kani_middle::attributes::{is_test_harness_description, KaniAttributes};
 use crate::kani_middle::contracts::GFnContract;
 use crate::kani_middle::metadata::gen_test_metadata;
 use crate::kani_middle::provide;
@@ -156,9 +154,6 @@ impl GotocCodegenBackend {
                 // declared and created before since we rip out the
                 // implementation from the contract function
                 let mut contract_info = SerializableContractMetadata::default();
-                if std::env::var("KANI_NO_ASSIGNS").is_ok() {
-                    return contract_info;
-                }
                 for item in &items {
                     if let MonoItem::Fn(instance @ Instance { def: InstanceDef::Item(did), .. }) =
                         item
@@ -170,18 +165,12 @@ impl GotocCodegenBackend {
                             let attrs = KaniAttributes::for_item(tcx, *did);
                             let assigns_contract =
                                 attrs.assigns_contract().unwrap_or_else(Vec::new);
-                            
+
                             // use crate::kani_middle::attributes::AssignablePlace;
-                            // use crate::kani_middle::resolve::resolve_path;
+                            use crate::kani_middle::resolve::resolve_path;
                             // use rustc_hir::def::DefKind;
                             // use rustc_middle::mir::ProjectionElem;
 
-                            // let recursion_tracker = resolve_path(
-                            //     tcx,
-                            //     tcx.parent_module_from_def_id(did.expect_local()),
-                            //     attrs.reentry_var().unwrap().as_str(),
-                            // )
-                            // .unwrap();
                             // assert_eq!(
                             //     tcx.def_kind(recursion_tracker),
                             //     DefKind::Static(rustc_ast::Mutability::Mut),
@@ -198,31 +187,56 @@ impl GotocCodegenBackend {
                             // );
 
                             let frees_contract = attrs.frees_contract().unwrap_or_else(Vec::new);
-                            let get_instance = |did| 
+                            let get_instance = |did| {
                                 Instance::expect_resolve(
                                     tcx,
                                     ParamEnv::reveal_all(),
                                     did,
                                     instance.args,
-                                );
+                                )
+                            };
                             let gcx = &mut gcx;
-                            let mut attach_contract = |target| 
+                            let mut attach_contract = |target| {
                                 gcx.attach_contract(
                                     target,
-                                    &GFnContract::new(vec![], vec![], assigns_contract.clone(), frees_contract.clone()),
-                                );
+                                    &GFnContract::new(
+                                        vec![],
+                                        vec![],
+                                        assigns_contract.clone(),
+                                        frees_contract.clone(),
+                                    ),
+                                )
+                            };
                             let name_for_inst = |inst| tcx.symbol_name(inst).to_string();
 
                             let mem_dummy_inst = get_instance(attrs.memory_havoc_dummy().unwrap());
                             attach_contract(mem_dummy_inst);
                             contract_info.replace_contracts.push(name_for_inst(mem_dummy_inst));
                             if is_check {
-                                let inner_check_inst = get_instance(attrs.memory_havoc_dummy().unwrap());
+                                let recursion_tracker = resolve_path(
+                                    tcx,
+                                    tcx.parent_module_from_def_id(did.expect_local()),
+                                    attrs.reentry_var().unwrap().as_str(),
+                                )
+                                .unwrap();
+                                let inner_check_inst = get_instance(attrs.inner_check().unwrap());
                                 attach_contract(inner_check_inst);
-                                assert!(contract_info.check_contract.replace(name_for_inst(inner_check_inst)).is_none());
+                                let var_name = tcx
+                                    .symbol_name(Instance::mono(tcx, recursion_tracker))
+                                    .to_string();
+                                println!("recursion tracker {var_name}");
+                                assert!(
+                                    contract_info
+                                        .check_contract
+                                        .replace((name_for_inst(inner_check_inst), var_name))
+                                        .is_none()
+                                );
                             }
                         }
                     }
+                }
+                if std::env::var("KANI_NO_ASSIGNS").is_ok() {
+                    return SerializableContractMetadata::default();
                 }
                 assert_eq!(
                     contract_info.check_contract.is_some(),
