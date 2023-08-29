@@ -12,14 +12,14 @@ use {
     },
 };
 
-use proc_macro2::{Ident, Span, TokenStream as TokenStream2};
+use proc_macro2::{Ident, Span, TokenStream as TokenStream2, TokenTree};
 
 /// Create a unique hash for a token stream (basically a [`std::hash::Hash`]
 /// impl for `proc_macro2::TokenStream`).
 fn hash_of_token_stream<H: std::hash::Hasher>(hasher: &mut H, stream: proc_macro2::TokenStream) {
-    use proc_macro2::TokenTree;
     use std::hash::Hash;
     for token in stream {
+        std::mem::discriminant(&token).hash(hasher);
         match token {
             TokenTree::Ident(i) => i.hash(hasher),
             TokenTree::Punct(p) => p.as_char().hash(hasher),
@@ -959,8 +959,33 @@ pub fn proof_for_contract(attr: TokenStream, item: TokenStream) -> TokenStream {
     .into()
 }
 
+fn is_token_stream_2_comma(t: &TokenTree) -> bool {
+    matches!(t, proc_macro2::TokenTree::Punct(p) if p.as_char() == ',')
+}
+
+fn chunks_by<'a, T, C: Default + Extend<T>>(
+    i: impl IntoIterator<Item = T> + 'a,
+    mut pred: impl FnMut(&T) -> bool + 'a,
+) -> impl Iterator<Item = C> + 'a {
+    let mut iter = i.into_iter();
+    std::iter::from_fn(move || {
+        let mut new = C::default();
+        let mut empty = true;
+        while let Some(tok) = iter.next() {
+            empty = false;
+            if pred(&tok) {
+                break;
+            } else {
+                new.extend([tok])
+            }
+        }
+        (!empty).then_some(new)
+    })
+}
+
 pub fn auto_contract_proof(attr: TokenStream, item: TokenStream) -> TokenStream {
-    assert!(attr.is_empty());
+    let attr = TokenStream2::from(attr);
+    let harness_attrs = chunks_by::<_, TokenStream2>(attr, is_token_stream_2_comma);
     let item_fn: &ItemFn = &parse_macro_input!(item);
 
     fn mk_ref(mutability: Option<syn::token::Mut>, inner: Expr) -> Expr {
@@ -996,6 +1021,7 @@ pub fn auto_contract_proof(attr: TokenStream, item: TokenStream) -> TokenStream 
 
     quote!(
         #[kani::proof_for_contract(#item_name)]
+        #(#[#harness_attrs])*
         fn #harness_name() {
             let _ = #call;
         }
