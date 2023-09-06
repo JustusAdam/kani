@@ -208,22 +208,31 @@ impl GotocCodegenBackend {
                                 )
                             };
                             let name_for_inst = |inst| tcx.symbol_name(inst).to_string();
+                            
+                            let handle_recursion = std::env::var("KANI_NO_RECURSION").is_err();
 
-                            let mem_dummy_inst = get_instance(attrs.memory_havoc_dummy().unwrap());
-                            attach_contract(mem_dummy_inst);
-                            contract_info.replace_contracts.push(name_for_inst(mem_dummy_inst));
+                            if !is_check || handle_recursion {
+                                let mem_dummy_inst = get_instance(attrs.memory_havoc_dummy().unwrap());
+                                attach_contract(mem_dummy_inst);
+                                contract_info.replace_contracts.push(name_for_inst(mem_dummy_inst));
+                            }
                             if is_check {
-                                let recursion_tracker = resolve_path(
-                                    tcx,
-                                    tcx.parent_module_from_def_id(did.expect_local()),
-                                    attrs.reentry_var().unwrap().as_str(),
-                                )
-                                .unwrap();
                                 let inner_check_inst = get_instance(attrs.inner_check().unwrap());
                                 attach_contract(inner_check_inst);
-                                let var_name = tcx
+                                let var_name = if handle_recursion { 
+                                    
+                                    let recursion_tracker = resolve_path(
+                                        tcx,
+                                        tcx.parent_module_from_def_id(did.expect_local()),
+                                        attrs.reentry_var().unwrap().as_str(),
+                                    )
+                                    .unwrap();
+                                    tcx
                                     .symbol_name(Instance::mono(tcx, recursion_tracker))
-                                    .to_string();
+                                    .to_string()
+                                } else {
+                                    "".to_string()
+                                };
                                 println!("recursion tracker {var_name}");
                                 assert!(
                                     contract_info

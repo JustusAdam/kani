@@ -290,8 +290,8 @@ impl<'tcx> GotocCtx<'tcx> {
         let goto_annotated_fn_name = self.current_fn().name();
         let goto_annotated_fn_typ = self
             .symbol_table
-            .lookup(goto_annotated_fn_name)
-            .expect("Function must have been declared")
+            .lookup(&goto_annotated_fn_name)
+            .unwrap_or_else(|| panic!("Function '{goto_annotated_fn_name}' is not declared"))
             .typ
             .clone();
 

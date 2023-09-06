@@ -191,7 +191,7 @@ impl KaniSession {
         if let Some((function, recursion_tracker)) = check {
             println!("enforcing function contract for {function}");
             args.extend(["--enforce-contract".into(), function.into()]);
-            if use_dfcc {
+            if use_dfcc && std::env::var("KANI_NO_RECURSION").is_err() {
                 args.extend(["--nondet-static-exclude".into(), recursion_tracker.into()]);
             }
         }

@@ -427,10 +427,15 @@ impl ContractFunctionState {
                 swapped!(&mut item_fn.attrs, &mut attrs, {
                     swapped!(&mut item_fn.sig.ident, &mut dummy_fn_name, {
                         let sig = &item_fn.sig;
+                        let replace_inner = if std::env::var("KANI_NO_ASSIGNS").is_ok() {
+                            quote!(kani::any())
+                        } else {
+                            quote!(unreachable!())
+                        };
                         output.extend(quote!(
                             #[allow(dead_code, unused_variables)]
                             #sig {
-                                kani::any()
+                                #replace_inner
                             }
                         ));
                     });
@@ -445,21 +450,33 @@ impl ContractFunctionState {
                         };
                         // This doesn't deal with the case where the inner body
                         // panics. In that case the boolean does not get reset.
-                        output.extend(quote!(
-                            static mut #reentry_ident: bool = false;
-                            #[allow(dead_code, unused_variables)]
-                            #[kanitool::is_contract_generated(recursion_wrapper)]
-                            #sig {
-                                if unsafe { #reentry_ident } {
-                                    #call_replace(#(#args),*)
-                                } else {
-                                    unsafe { #reentry_ident = true };
-                                    let result = #call_check(#(#also_args),*);
-                                    unsafe { #reentry_ident = false };
-                                    result
-                                }
+                        output.extend(
+                            if std::env::var("KANI_NO_RECURSION").is_ok() {
+                                quote!(
+                                    #[allow(dead_code, unused_variables)]
+                                    #[kanitool::is_contract_generated(recursion_wrapper)]
+                                    #sig {
+                                        #call_check(#(#also_args),*)
+                                    }
+                                )
+                            } else {
+                                quote!(
+                                    static mut #reentry_ident: bool = false;
+                                    #[allow(dead_code, unused_variables)]
+                                    #[kanitool::is_contract_generated(recursion_wrapper)]
+                                    #sig {
+                                        if unsafe { #reentry_ident } {
+                                            #call_replace(#(#args),*)
+                                        } else {
+                                            unsafe { #reentry_ident = true };
+                                            let result = #call_check(#(#also_args),*);
+                                            unsafe { #reentry_ident = false };
+                                            result
+                                        }
+                                    }
+                                )
                             }
-                        ));
+                        );
                     });
                     output.extend(quote!(
                         #(#attrs)*
