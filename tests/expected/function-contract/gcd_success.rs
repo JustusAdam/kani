@@ -26,11 +26,6 @@ fn gcd(x: T, y: T) -> T {
     }
 }
 
-#[kani::proof_for_contract(gcd)]
-fn simple_harness() {
-    let _ = gcd(kani::any(), kani::any());
-}
-
 struct Frac {
     pub num: T,
     pub den: T,

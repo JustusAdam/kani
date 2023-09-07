@@ -15,7 +15,7 @@ use rustc_middle::ty::layout::{
     FnAbiError, FnAbiOf, FnAbiOfHelpers, FnAbiRequest, HasParamEnv, HasTyCtxt, LayoutError,
     LayoutOfHelpers, TyAndLayout,
 };
-use rustc_middle::ty::{self, BoundVariableKind, Instance, InstanceDef, ParamEnv, Ty, TyCtxt};
+use rustc_middle::ty::{self, Instance, InstanceDef, ParamEnv, Ty, TyCtxt};
 use rustc_session::config::OutputType;
 use rustc_span::source_map::respan;
 use rustc_span::Span;
@@ -31,6 +31,7 @@ pub mod analysis;
 pub mod attributes;
 pub mod coercion;
 pub mod contracts;
+mod intrinsics;
 pub mod metadata;
 pub mod provide;
 pub mod reachability;
@@ -74,22 +75,21 @@ pub fn check_reachable_items<'tcx>(tcx: TyCtxt<'tcx>, queries: &QueryDb, items: 
         if !def_ids.contains(&def_id) {
             // Check if any unstable attribute was reached.
             KaniAttributes::for_item(tcx, def_id)
-                .check_unstable_features(&queries.unstable_features);
+                .check_unstable_features(&queries.args().unstable_features);
             def_ids.insert(def_id);
         }
 
         // We don't short circuit here since this is a type check and can shake
-        // out differently depending on generic parameters
-        // if let MonoItem::Fn(instance) = item {
-        //     if attributes::is_function_contract_generated(tcx, instance.def_id()) {
-        //         check_is_contract_safe(tcx, *instance);
-        //     }
-        // }
+        // out differently depending on generic parameters.
+        if let MonoItem::Fn(instance) = item {
+            if attributes::is_function_contract_generated(tcx, instance.def_id()) {
+                check_is_contract_safe(tcx, *instance);
+            }
+        }
     }
     tcx.sess.abort_if_errors();
 }
 
-#[allow(dead_code)]
 /// A basic check that ensures a function with a contract does not receive
 /// mutable pointers in its input and does not return raw pointers of any kind.
 ///
@@ -104,7 +104,7 @@ fn check_is_contract_safe<'tcx>(tcx: TyCtxt<'tcx>, instance: Instance<'tcx>) {
         /// composing error messages.
         r#where: &'static str,
         /// Adjective to describe the kind of pointer we're prohibiting.
-        /// Essentially `is_prohibited` but in english
+        /// Essentially `is_prohibited` but in English.
         what: &'static str,
     }
 
@@ -117,7 +117,7 @@ fn check_is_contract_safe<'tcx>(tcx: TyCtxt<'tcx>, instance: Instance<'tcx>) {
             }
 
             // Rust's type visitor only recurses into type arguments, (e.g.
-            // `generics` in this match). This is enough for may types, but it
+            // `generics` in this match). This is enough for many types, but it
             // won't look at the field types of structs or enums. So we override
             // it here and do that ourselves.
             //
@@ -138,7 +138,7 @@ fn check_is_contract_safe<'tcx>(tcx: TyCtxt<'tcx>, instance: Instance<'tcx>) {
                 }
                 std::ops::ControlFlow::Continue(())
             } else {
-                // For every other type
+                // For every other type.
                 t.super_visit_with(self)
             }
         }
@@ -151,10 +151,10 @@ fn check_is_contract_safe<'tcx>(tcx: TyCtxt<'tcx>, instance: Instance<'tcx>) {
     let bound_fn_sig = instance.ty(tcx, ParamEnv::reveal_all()).fn_sig(tcx);
 
     for v in bound_fn_sig.bound_vars() {
-        if let BoundVariableKind::Ty(t) = v {
-            tcx.sess.span_warn(
+        if let ty::BoundVariableKind::Ty(t) = v {
+            tcx.sess.span_err(
                 tcx.def_span(instance.def_id()),
-                format!("Found a bound type variable {t:?}"),
+                format!("Found a bound type variable {t:?} after monomorphization"),
             );
         }
     }

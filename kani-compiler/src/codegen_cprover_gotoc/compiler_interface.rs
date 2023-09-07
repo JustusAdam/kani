@@ -3,6 +3,7 @@
 
 //! This file contains the code necessary to interface with the compiler backend
 
+use crate::args::ReachabilityType;
 use crate::codegen_cprover_gotoc::GotocCtx;
 use crate::kani_middle::attributes::{is_test_harness_description, KaniAttributes};
 use crate::kani_middle::contracts::GFnContract;
@@ -13,7 +14,7 @@ use crate::kani_middle::reachability::{
 };
 use crate::kani_middle::{analysis, attributes};
 use crate::kani_middle::{check_reachable_items, dump_mir_items};
-use crate::kani_queries::{QueryDb, ReachabilityType};
+use crate::kani_queries::QueryDb;
 use cbmc::goto_program::Location;
 use cbmc::irep::goto_binary_serde::write_goto_binary_file;
 use cbmc::RoundingMode;
@@ -212,19 +213,25 @@ impl GotocCodegenBackend {
                             let handle_recursion = std::env::var("KANI_NO_RECURSION").is_err();
 
                             if !is_check || handle_recursion {
-                                let mem_dummy_inst = get_instance(attrs.memory_havoc_dummy().unwrap());
+                                let Ok(dummy_id) = attrs.memory_havoc_dummy().unwrap() else {
+                                    continue;
+                                };
+                                let mem_dummy_inst = get_instance(dummy_id);
                                 attach_contract(mem_dummy_inst);
                                 contract_info.replace_contracts.push(name_for_inst(mem_dummy_inst));
                             }
                             if is_check {
-                                let inner_check_inst = get_instance(attrs.inner_check().unwrap());
+                                let Ok(inner_check_id) = attrs.inner_check().unwrap() else {
+                                    continue;
+                                };
+                                let inner_check_inst = get_instance(inner_check_id);
                                 attach_contract(inner_check_inst);
                                 let var_name = if handle_recursion { 
-                                    
+                                    let Ok(reentry_sym) = attrs.reentry_var().unwrap() else { continue; };
                                     let recursion_tracker = resolve_path(
                                         tcx,
-                                        tcx.parent_module_from_def_id(did.expect_local()),
-                                        attrs.reentry_var().unwrap().as_str(),
+                                        tcx.parent_module_from_def_id(did.expect_local()).to_local_def_id(),
+                                        reentry_sym.as_str(),
                                     )
                                     .unwrap();
                                     tcx
@@ -277,9 +284,9 @@ impl GotocCodegenBackend {
 
         // No output should be generated if user selected no_codegen.
         if !tcx.sess.opts.unstable_opts.no_codegen && tcx.sess.opts.output_types.should_codegen() {
-            let pretty = self.queries.lock().unwrap().output_pretty_json;
+            let pretty = self.queries.lock().unwrap().args().output_pretty_json;
             write_file(&symtab_goto, ArtifactType::PrettyNameMap, &pretty_name_map, pretty);
-            if gcx.queries.write_json_symtab {
+            if gcx.queries.args().write_json_symtab {
                 write_file(&symtab_goto, ArtifactType::SymTab, &gcx.symbol_table, pretty);
                 symbol_table_to_gotoc(&tcx, &symtab_goto);
             } else {
@@ -301,12 +308,12 @@ impl GotocCodegenBackend {
 fn contract_metadata_for_harness(
     tcx: TyCtxt,
     def_id: DefId,
-) -> ContractMetadata<DefId, FxHashSet<DefId>> {
+) -> Result<ContractMetadata<DefId, FxHashSet<DefId>>, ErrorGuaranteed> {
     let attrs = attributes::KaniAttributes::for_item(tcx, def_id);
-    ContractMetadata {
-        check_contract: attrs.interpret_the_for_contract_attribute().map(|(_, id, _)| id),
-        replace_contracts: attrs.use_contract().into_iter().map(|(_, id, _)| id).collect(),
-    }
+    Ok(ContractMetadata {
+        check_contract: attrs.interpret_the_for_contract_attribute().transpose()?.map(|(_, id, _)| id),
+        replace_contracts: attrs.use_contract().into_iter().map(|t| t.map(|(_, id, _)| id)).collect::<Result<FxHashSet<_>, ErrorGuaranteed>>()?,
+    })
 }
 
 impl CodegenBackend for GotocCodegenBackend {
@@ -319,7 +326,7 @@ impl CodegenBackend for GotocCodegenBackend {
     }
 
     fn provide_extern(&self, providers: &mut ExternProviders) {
-        provide::provide_extern(providers);
+        provide::provide_extern(providers, &self.queries.lock().unwrap());
     }
 
     fn print_version(&self) {
@@ -351,7 +358,7 @@ impl CodegenBackend for GotocCodegenBackend {
         // - PubFns: Generate code for all reachable logic starting from the local public functions.
         // - None: Don't generate code. This is used to compile dependencies.
         let base_filename = tcx.output_filenames(()).output_path(OutputType::Object);
-        let reachability = queries.reachability_analysis;
+        let reachability = queries.args().reachability_analysis;
         let mut results = GotoCodegenResults::new(tcx, reachability);
         match reachability {
             ReachabilityType::Harnesses => {
@@ -364,12 +371,15 @@ impl CodegenBackend for GotocCodegenBackend {
                 for harness in harnesses {
                     let model_path =
                         queries.harness_model_path(&tcx.def_path_hash(harness.def_id())).unwrap();
+                    let Ok(contract_metadata) = contract_metadata_for_harness(tcx, harness.def_id()) else {
+                        continue;
+                    };
                     let (gcx, items) = self.codegen_items(
                         tcx,
                         &[harness],
                         model_path,
                         &results.machine_model,
-                        contract_metadata_for_harness(tcx, harness.def_id()),
+                        contract_metadata,
                     );
                     results.extend(gcx, items, None);
                 }
@@ -446,7 +456,7 @@ impl CodegenBackend for GotocCodegenBackend {
                     &base_filename,
                     ArtifactType::Metadata,
                     &results.generate_metadata(),
-                    queries.output_pretty_json,
+                    queries.args().output_pretty_json,
                 );
             }
         }
@@ -486,7 +496,7 @@ impl CodegenBackend for GotocCodegenBackend {
         codegen_results: CodegenResults,
         outputs: &OutputFilenames,
     ) -> Result<(), ErrorGuaranteed> {
-        let requested_crate_types = sess.crate_types();
+        let requested_crate_types = &codegen_results.crate_info.crate_types;
         for crate_type in requested_crate_types {
             let out_fname = out_filename(
                 sess,

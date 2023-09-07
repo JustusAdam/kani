@@ -74,7 +74,7 @@ pub fn build_lib(bin_folder: &Path) -> Result<()> {
 fn build_verification_lib(compiler_path: &Path) -> Result<()> {
     let extra_args =
         ["-Z", "build-std=panic_abort,std,test", "--config", "profile.dev.panic=\"abort\""];
-    let compiler_args = ["--kani-compiler", "-Cllvm-args=--ignore-global-asm"];
+    let compiler_args = ["--kani-compiler", "-Cllvm-args=--ignore-global-asm --build-std"];
     build_kani_lib(compiler_path, &kani_sysroot_lib(), &extra_args, &compiler_args)
 }
 
@@ -192,12 +192,12 @@ fn is_std_lib(artifact: &Artifact) -> bool {
 /// predicate, it will copy the following files to the `target` folder.
 ///  - `rlib`: Store metadata for future codegen and executable code for concrete executions.
 ///  - shared library which are used for proc_macros.
-fn copy_libs<P>(artifacts: &[Artifact], target: &Path, predicate: P)
+fn copy_libs<P>(artifacts: &[Artifact], target: &Path, mut predicate: P)
 where
     P: FnMut(&Artifact) -> bool,
 {
     assert!(target.is_dir(), "Expected a folder, but found {}", target.display());
-    for artifact in artifacts.iter().cloned().filter(predicate) {
+    for artifact in artifacts.iter().filter(|&x| predicate(x)).cloned() {
         artifact
             .filenames
             .iter()

@@ -53,11 +53,11 @@ enum KaniAttributeKind {
     CheckedWith,
     ReplacedWith,
     MemoryHavocDummy,
+    ReentryVar,
+    InnerCheck,
     /// Attribute on a function that was auto-generated from expanding a
     /// function contract.
     IsContractGenerated,
-    ReentryVar,
-    InnerCheck,
 }
 
 impl KaniAttributeKind {
@@ -83,19 +83,22 @@ impl KaniAttributeKind {
         }
     }
 
-    /// Is this attribute kind one of the suite of attributes that form the
-    /// function contracts API. E.g. where [`Self::is_function_contract`] is
-    /// true but also auto harness attributes like `proof_for_contract`
-    pub fn is_function_contract_api(self) -> bool {
-        use KaniAttributeKind::*;
-        self.is_function_contract() || matches!(self, ProofForContract)
+    /// Is this an "active" function contract attribute? This means it is
+    /// part of the function contract interface *and* it implies that a contract
+    /// will be used (stubbed or checked) in some way, thus requiring that the
+    /// user activate the unstable feature.
+    ///
+    /// If we find an "inactive" contract attribute we chose not to error,
+    /// because it wouldn't have any effect anyway.
+    pub fn demands_function_contract_use(self) -> bool {
+        matches!(self, KaniAttributeKind::ProofForContract)
     }
 
     /// Would this attribute be placed on a function as part of a function
-    /// contract. E.g. created by `requires`, `ensures`
+    /// contract. E.g. created by `requires`, `ensures`.
     pub fn is_function_contract(self) -> bool {
         use KaniAttributeKind::*;
-        matches!(self, CheckedWith | ReplacedWith | IsContractGenerated | InnerCheck)
+        matches!(self, CheckedWith | IsContractGenerated)
     }
 }
 
@@ -155,112 +158,110 @@ impl<'tcx> KaniAttributes<'tcx> {
         }
     }
 
-    /// Parse and extract the `proof_for_contract(TARGET)` attribute. The
-    /// returned symbol and defid are respectively the name and id of `TARGET`,
-    /// the span in the span for the attribute (contents).
-    pub fn interpret_the_for_contract_attribute(&self) -> Option<(Symbol, DefId, Span)> {
-        self.expect_maybe_one(KaniAttributeKind::ProofForContract).and_then(|target| {
-            let name = expect_key_string_value(self.tcx.sess, target);
-            let resolved = self.resolve_sibling(name.as_str());
-            match resolved {
-                Err(e) => {
-                    self.tcx.sess.span_err(
-                        target.span,
-                        format!(
-                            "Failed to resolve replacement function {} because {e}",
-                            name.as_str()
-                        ),
-                    );
-                    None
-                }
-                Ok(ok) => Some((name, ok, target.span)),
-            }
-        })
+    pub fn use_contract(&self) -> Vec<Result<(Symbol, DefId, Span), ErrorGuaranteed>> {
+        self.map.get(&KaniAttributeKind::StubVerified).map_or([].as_slice(), Vec::as_slice)
+            .iter()
+            .map(|attr| {
+                let name = expect_key_string_value(self.tcx.sess, attr)?;
+                let ok = self.resolve_sibling(name.as_str())
+                    .map_err(|e| 
+                        self.tcx.sess.span_err(
+                            attr.span,
+                            format!(
+                                "Sould not resolve replacement function {} because {e}",
+                                name.as_str()
+                            ),
+                        ))?;
+                Ok((name, ok, attr.span))
+            })
+            .collect()
     }
 
-    pub fn use_contract(&self) -> Vec<(Symbol, DefId, Span)> {
-        self.map.get(&KaniAttributeKind::StubVerified).map_or_else(Vec::new, |attr| {
-            attr.iter()
-                .filter_map(|attr| {
-                    let name = expect_key_string_value(self.tcx.sess, attr);
-                    let resolved = self.resolve_sibling(name.as_str());
-                    match resolved {
-                        Err(e) => {
-                            self.tcx.sess.span_err(
-                                attr.span,
-                                format!(
-                                    "Sould not resolve replacement function {} because {e}",
-                                    name.as_str()
-                                ),
-                            );
-                            None
-                        }
-                        Ok(ok) => Some((name, ok, attr.span)),
-                    }
-                })
-                .collect()
+    /// Parse and extract the `proof_for_contract(TARGET)` attribute. The
+    /// returned symbol and DefId are respectively the name and id of `TARGET`,
+    /// the span in the span for the attribute (contents).
+    pub fn interpret_the_for_contract_attribute(
+        &self,
+    ) -> Option<Result<(Symbol, DefId, Span), ErrorGuaranteed>> {
+        self.expect_maybe_one(KaniAttributeKind::ProofForContract).map(|target| {
+            let name = expect_key_string_value(self.tcx.sess, target)?;
+            let resolved = resolve_fn(
+                self.tcx,
+                self.tcx.parent_module_from_def_id(self.item.expect_local()).to_local_def_id(),
+                name.as_str(),
+            );
+            resolved.map(|ok| (name, ok, target.span)).map_err(|resolve_err| {
+                self.tcx.sess.span_err(
+                    target.span,
+                    format!(
+                        "Failed to resolve replacement function {} because {resolve_err}",
+                        name.as_str()
+                    ),
+                )
+            })
         })
     }
 
     /// Extract the name of the sibling function this contract is checked with
-    /// (if any)
-    pub fn checked_with(&self) -> Option<Symbol> {
+    /// (if any).
+    pub fn checked_with(&self) -> Option<Result<Symbol, ErrorGuaranteed>> {
         self.expect_maybe_one(KaniAttributeKind::CheckedWith)
             .map(|target| expect_key_string_value(self.tcx.sess, target))
     }
 
     #[allow(dead_code)]
-    pub fn reentry_var(&self) -> Option<Symbol> {
+    pub fn reentry_var(&self) -> Option<Result<Symbol, ErrorGuaranteed>> {
         self.expect_maybe_one(KaniAttributeKind::ReentryVar)
             .map(|target| expect_key_string_value(self.tcx.sess, target))
     }
 
     #[allow(dead_code)]
-    pub fn inner_check(&self) -> Option<DefId> {
+    pub fn inner_check(&self) -> Option<Result<DefId, ErrorGuaranteed>> {
         self.eval_sibling_attribute(KaniAttributeKind::InnerCheck)
     }
 
-    pub fn replaced_with(&self) -> Option<Symbol> {
+    pub fn replaced_with(&self) -> Option<Result<Symbol, ErrorGuaranteed>> {
         self.expect_maybe_one(KaniAttributeKind::ReplacedWith)
             .map(|target| expect_key_string_value(self.tcx.sess, target))
     }
 
     #[allow(dead_code)]
-    pub fn memory_havoc_dummy(&self) -> Option<DefId> {
+    pub fn memory_havoc_dummy(&self) -> Option<Result<DefId, ErrorGuaranteed>> {
         self.eval_sibling_attribute(KaniAttributeKind::MemoryHavocDummy)
     }
 
-    fn eval_sibling_attribute(&self, kind: KaniAttributeKind) -> Option<DefId> {
+    fn eval_sibling_attribute(&self, kind: KaniAttributeKind) -> Option<Result<DefId, ErrorGuaranteed>> {
         use rustc_hir::{Item, ItemKind, Mod, Node};
-        let name = self
+        self
             .expect_maybe_one(kind)
-            .map(|target| expect_key_string_value(self.tcx.sess, target))?;
+            .map(|target| {
+                let name = expect_key_string_value(self.tcx.sess, target)?;
+                let hir_map = self.tcx.hir();
+                let hir_id = hir_map.local_def_id_to_hir_id(self.item.expect_local());
+                let find_in_mod = |md: &Mod<'_>| {
+                    md.item_ids.iter().find(|it| hir_map.item(**it).ident.name == name).unwrap().hir_id()
+                };
 
-        let hir_map = self.tcx.hir();
-        let hir_id = hir_map.local_def_id_to_hir_id(self.item.expect_local());
-        let find_in_mod = |md: &Mod<'_>| {
-            md.item_ids.iter().find(|it| hir_map.item(**it).ident.name == name).unwrap().hir_id()
-        };
-
-        let result = match hir_map.get_parent(hir_id) {
-            Node::Item(Item { kind, .. }) => match kind {
-                ItemKind::Mod(m) => find_in_mod(m),
-                ItemKind::Impl(imp) => {
-                    imp.items.iter().find(|it| it.ident.name == name).unwrap().id.hir_id()
+                let result = match hir_map.get_parent(hir_id) {
+                    Node::Item(Item { kind, .. }) => match kind {
+                        ItemKind::Mod(m) => find_in_mod(m),
+                        ItemKind::Impl(imp) => {
+                            imp.items.iter().find(|it| it.ident.name == name).unwrap().id.hir_id()
+                        }
+                        other => panic!("Odd parent item kind {other:?}"),
+                    },
+                    Node::Crate(m) => find_in_mod(m),
+                    other => panic!("Odd parent node type {other:?}"),
                 }
-                other => panic!("Odd parent item kind {other:?}"),
-            },
-            Node::Crate(m) => find_in_mod(m),
-            other => panic!("Odd parent node type {other:?}"),
-        }
-        .expect_owner()
-        .def_id
-        .to_def_id();
-        Some(result)
+                .expect_owner()
+                .def_id
+                .to_def_id();
+                Ok(result)
+            })
     }
 
     fn resolve_sibling(&self, path_str: &str) -> Result<DefId, ResolveError<'tcx>> {
-        resolve_fn(self.tcx, self.tcx.parent_module_from_def_id(self.item.expect_local()), path_str)
+        resolve_fn(self.tcx, self.tcx.parent_module_from_def_id(self.item.expect_local()).to_local_def_id(), path_str)
     }
 
     /// Check that all attributes assigned to an item is valid.
@@ -270,14 +271,13 @@ impl<'tcx> KaniAttributes<'tcx> {
         // Check that all attributes are correctly used and well formed.
         let is_harness = self.is_harness();
         for (&kind, attrs) in self.map.iter() {
+            let local_error = |msg| self.tcx.sess.span_err(attrs[0].span, msg);
+
             if !is_harness && kind.is_harness_only() {
-                self.tcx.sess.span_err(
-                    attrs[0].span,
-                    format!(
-                        "the `{}` attribute also requires the `#[kani::proof]` attribute",
-                        kind.as_ref()
-                    ),
-                );
+                local_error(format!(
+                    "the `{}` attribute also requires the `#[kani::proof]` attribute",
+                    kind.as_ref()
+                ));
             }
             match kind {
                 KaniAttributeKind::ShouldPanic => {
@@ -302,7 +302,11 @@ impl<'tcx> KaniAttributes<'tcx> {
                     })
                 }
                 KaniAttributeKind::Proof => {
-                    assert!(!self.map.contains_key(&KaniAttributeKind::ProofForContract));
+                    if self.map.contains_key(&KaniAttributeKind::ProofForContract) {
+                        local_error(
+                            "`proof` and `proof_for_contract` may not be used on the same function.".to_string(),
+                        );
+                    }
                     expect_single(self.tcx, kind, &attrs);
                     attrs.iter().for_each(|attr| self.check_proof_attribute(attr))
                 }
@@ -310,7 +314,11 @@ impl<'tcx> KaniAttributes<'tcx> {
                     let _ = UnstableAttribute::try_from(*attr).map_err(|err| err.report(self.tcx));
                 }),
                 KaniAttributeKind::ProofForContract => {
-                    assert!(!self.map.contains_key(&KaniAttributeKind::Proof));
+                    if self.map.contains_key(&KaniAttributeKind::Proof) {
+                        local_error(
+                            "`proof` and `proof_for_contract` may not be used on the same function.".to_string(),
+                        );
+                    }
                     expect_single(self.tcx, kind, &attrs);
                 }
                 KaniAttributeKind::StubVerified => {}
@@ -351,7 +359,7 @@ impl<'tcx> KaniAttributes<'tcx> {
         // If the `function-contracts` unstable feature is not enabled then no
         // function should use any of those APIs.
         if !enabled_features.iter().any(|feature| feature == "function-contracts") {
-            for kind in self.map.keys().copied().filter(|a| a.is_function_contract_api()) {
+            for kind in self.map.keys().copied().filter(|a| a.demands_function_contract_use()) {
                 let msg = format!(
                     "Using the {} attribute requires activating the unstable `function-contracts` feature",
                     kind.as_ref()
@@ -408,83 +416,73 @@ impl<'tcx> KaniAttributes<'tcx> {
     /// Note that all attributes should be valid by now.
     pub fn harness_attributes(&self) -> HarnessAttributes {
         // Abort if not local.
-        let Some(local_id) = self.item.as_local() else {
+        if !self.item.is_local() {
             panic!("Expected a local item, but got: {:?}", self.item);
         };
         trace!(?self, "extract_harness_attributes");
         assert!(self.is_harness());
-        let mut attrs = self.map.iter().fold(
-            HarnessAttributes::default(),
-            |mut harness, (kind, attributes)| {
-                match kind {
-                    KaniAttributeKind::ShouldPanic => harness.should_panic = true,
-                    KaniAttributeKind::Solver => {
-                        harness.solver = parse_solver(self.tcx, attributes[0]);
-                    }
-                    KaniAttributeKind::Stub => {
-                        harness.stubs = parse_stubs(self.tcx, self.item, attributes);
-                    }
-                    KaniAttributeKind::Unwind => {
-                        harness.unwind_value = parse_unwind(self.tcx, attributes[0])
-                    }
-                    KaniAttributeKind::Proof | KaniAttributeKind::ProofForContract => {
-                        harness.proof = true
-                    }
-                    KaniAttributeKind::Unstable => {
-                        // Internal attribute which shouldn't exist here.
-                        unreachable!()
-                    }
-                    KaniAttributeKind::CheckedWith
-                    | KaniAttributeKind::IsContractGenerated
-                    | KaniAttributeKind::Assigns
-                    | KaniAttributeKind::Frees
-                    | KaniAttributeKind::MemoryHavocDummy
-                    | KaniAttributeKind::ReentryVar
-                    | KaniAttributeKind::InnerCheck
-                    | KaniAttributeKind::ReplacedWith => {
-                        todo!("Contract attributes are not supported on proofs")
-                    }
-                    KaniAttributeKind::StubVerified => {}
-                };
-                harness
-            },
-        );
-        let current_module = self.tcx.parent_module_from_def_id(local_id);
-        attrs.stubs.extend(
-            self.interpret_the_for_contract_attribute()
-                .and_then(|(name, id, span)| {
-                    let replacement_name = KaniAttributes::for_item(self.tcx, id).checked_with();
-                    if replacement_name.is_none() {
+        self.map.iter().fold(HarnessAttributes::default(), |mut harness, (kind, attributes)| {
+            match kind {
+                KaniAttributeKind::ShouldPanic => harness.should_panic = true,
+                KaniAttributeKind::Solver => {
+                    harness.solver = parse_solver(self.tcx, attributes[0]);
+                }
+                KaniAttributeKind::Stub => {
+                    harness.stubs.extend_from_slice(&parse_stubs(self.tcx, self.item, attributes));
+                }
+                KaniAttributeKind::Unwind => {
+                    harness.unwind_value = parse_unwind(self.tcx, attributes[0])
+                }
+                KaniAttributeKind::Proof => harness.proof = true,
+                KaniAttributeKind::ProofForContract => {
+                    harness.proof = true;
+                    let Some(Ok((name, id, span))) = self.interpret_the_for_contract_attribute()
+                    else {
+                        self.tcx.sess.span_err(
+                            self.tcx.def_span(self.item),
+                            format!("Invalid `{}` attribute format", kind.as_ref()),
+                        );
+                        return harness;
+                    };
+                    let Some(Ok(replacement_name)) =
+                        KaniAttributes::for_item(self.tcx, id).checked_with()
+                    else {
                         self.tcx
                             .sess
                             .span_err(span, "Target function for this check has no contract");
+                        return harness;
+                    };
+                    harness.stubs.push(self.stub_for_relative_item(name, replacement_name));
+                }
+                KaniAttributeKind::StubVerified => {
+                    for contract in self.use_contract() {
+                        let Ok((name, def_id, _span)) = contract else { continue; };
+                        let Some(Ok(replacement_name)) = KaniAttributes::for_item(self.tcx, def_id).replaced_with() else {
+                            // TODO report errors
+                            continue;
+                        };
+                        harness.stubs.push(
+                            self.stub_for_relative_item(name, replacement_name))
                     }
-                    Some((name, replacement_name?))
-                })
-                .into_iter()
-                .chain(self.use_contract().into_iter().filter_map(|(name, id, span)| {
-                    let replacement_name = KaniAttributes::for_item(self.tcx, id).replaced_with();
-                    if replacement_name.is_none() {
-                        self.tcx.sess.span_err(
-                            span,
-                            "The target item of this verified stubbing has no contract",
-                        );
-                    }
-                    Some((name, replacement_name?))
-                }))
-                .map(|(original, replacement)| {
-                    let replace_str = replacement.as_str();
-                    let original_str = original.as_str();
-                    let replacement = original_str.rsplit_once("::").map_or_else(
-                        || replace_str.to_string(),
-                        |t| t.0.to_string() + "::" + replace_str,
-                    );
-                    println!("Replacing {original} with contract {replacement}");
-                    resolve::resolve_fn(self.tcx, current_module, &replacement).unwrap();
-                    Stub { original: original_str.to_string(), replacement }
-                }),
-        );
-        attrs
+                }
+                KaniAttributeKind::Unstable => {
+                    // Internal attribute which shouldn't exist here.
+                    unreachable!()
+                }
+                KaniAttributeKind::CheckedWith
+                | KaniAttributeKind::IsContractGenerated
+                | KaniAttributeKind::Assigns
+                | KaniAttributeKind::Frees
+                | KaniAttributeKind::MemoryHavocDummy
+                | KaniAttributeKind::ReentryVar
+                | KaniAttributeKind::InnerCheck
+                | KaniAttributeKind::ReplacedWith => {
+                    // TODO better error
+                    panic!("Contract attributes are not supported on proofs")
+                }
+            };
+            harness
+        })
     }
 
     /// Check that if this item is tagged with a proof_attribute, it is a valid harness.
@@ -531,6 +529,17 @@ impl<'tcx> KaniAttributes<'tcx> {
                 .collect()
         })
     }
+    fn stub_for_relative_item(&self, anchor: Symbol, replacement: Symbol) -> Stub {
+        let local_id = self.item.expect_local();
+        let current_module = self.tcx.parent_module_from_def_id(local_id);
+        let replace_str = replacement.as_str();
+        let original_str = anchor.as_str();
+        let replacement = original_str
+            .rsplit_once("::")
+            .map_or_else(|| replace_str.to_string(), |t| t.0.to_string() + "::" + replace_str);
+        resolve::resolve_fn(self.tcx, current_module.to_local_def_id(), &replacement).unwrap();
+        Stub { original: original_str.to_string(), replacement }
+    }
 }
 
 /// An efficient check for the existence for a particular [`KaniAttributeKind`].
@@ -544,9 +553,8 @@ fn has_kani_attribute<F: Fn(KaniAttributeKind) -> bool>(
     tcx.get_attrs_unchecked(def_id).iter().filter_map(|a| attr_kind(tcx, a)).any(predicate)
 }
 
-#[allow(dead_code)]
-/// Test is this function was generated by expanding a contract attribute like
-/// `requires` and `ensures`
+/// Test if this function was generated by expanding a contract attribute like
+/// `requires` and `ensures`.
 pub fn is_function_contract_generated(tcx: TyCtxt, def_id: DefId) -> bool {
     has_kani_attribute(tcx, def_id, KaniAttributeKind::is_function_contract)
 }
@@ -928,23 +936,39 @@ fn parse_frees_values<'tcx: 'a, 'a>(
 }
 
 /// Expect the contents of this attribute to be of the format #[attribute =
-/// "value"] and return the `"value"`
-fn expect_key_string_value(sess: &Session, attr: &Attribute) -> rustc_span::Symbol {
+/// "value"] and return the `"value"`.
+fn expect_key_string_value(
+    sess: &Session,
+    attr: &Attribute,
+) -> Result<rustc_span::Symbol, ErrorGuaranteed> {
     let span = attr.span;
     let AttrArgs::Eq(_, it) = &attr.get_normal_item().args else {
-        sess.span_fatal(span, "Expected attribute of the form #[attr = \"value\"]")
+        return Err(sess.span_err(span, "Expected attribute of the form #[attr = \"value\"]"));
     };
     let maybe_str = match it {
-        AttrArgsEq::Ast(expr) => match expr.kind {
-            ExprKind::Lit(tok) => LitKind::from_token_lit(tok).unwrap().str(),
-            _ => sess.span_fatal(span, "Expected literal string as right hand side of `=`"),
-        },
+        AttrArgsEq::Ast(expr) => {
+            if let ExprKind::Lit(tok) = expr.kind {
+                match LitKind::from_token_lit(tok) {
+                    Ok(l) => l.str(),
+                    Err(err) => {
+                        return Err(sess.span_err(
+                            span,
+                            format!("Invalid string literal on right hand side of `=` {err:?}"),
+                        ));
+                    }
+                }
+            } else {
+                return Err(
+                    sess.span_err(span, "Expected literal string as right hand side of `=`")
+                );
+            }
+        }
         AttrArgsEq::Hir(lit) => lit.kind.str(),
     };
     if let Some(str) = maybe_str {
-        str
+        Ok(str)
     } else {
-        sess.span_fatal(span, "Expected literal string as right hand side of `=`")
+        Err(sess.span_err(span, "Expected literal string as right hand side of `=`"))
     }
 }
 
@@ -1064,7 +1088,7 @@ fn parse_unwind(tcx: TyCtxt, attr: &Attribute) -> Option<u32> {
 fn parse_stubs(tcx: TyCtxt, harness: DefId, attributes: &[&Attribute]) -> Vec<Stub> {
     let current_module = tcx.parent_module_from_def_id(harness.expect_local());
     let check_resolve = |attr: &Attribute, name: &str| {
-        let result = resolve::resolve_fn(tcx, current_module, name);
+        let result = resolve::resolve_fn(tcx, current_module.to_local_def_id(), name);
         if let Err(err) = result {
             tcx.sess.span_err(attr.span, format!("failed to resolve `{name}`: {err}"));
         }

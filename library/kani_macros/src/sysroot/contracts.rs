@@ -10,16 +10,19 @@ use {
         parse_macro_input, spanned::Spanned, visit::Visit, Expr, ExprCall, ExprPath, ItemFn, Path,
         PathSegment,
     },
+    syn::{parse_macro_input, spanned::Spanned, visit::Visit, Expr, ItemFn},
 };
 
 use proc_macro2::{Ident, Span, TokenStream as TokenStream2, TokenTree};
 
+use proc_macro2::{Ident, Span, TokenStream as TokenStream2};
+
 /// Create a unique hash for a token stream (basically a [`std::hash::Hash`]
 /// impl for `proc_macro2::TokenStream`).
 fn hash_of_token_stream<H: std::hash::Hasher>(hasher: &mut H, stream: proc_macro2::TokenStream) {
+    use proc_macro2::TokenTree;
     use std::hash::Hash;
     for token in stream {
-        std::mem::discriminant(&token).hash(hasher);
         match token {
             TokenTree::Ident(i) => i.hash(hasher),
             TokenTree::Punct(p) => p.as_char().hash(hasher),
@@ -276,6 +279,14 @@ impl<'a> VisitMut for Renamer<'a> {
 
 /// Does the provided path have the same chain of identifiers as `mtch` (match)
 /// and no arguments anywhere?
+///
+/// So for instance (using some pseudo-syntax for the [`syn::Path`]s)
+/// `matches_path(std::vec::Vec, &["std", "vec", "Vec"]) == true` but
+/// `matches_path(std::Vec::<bool>::contains, &["std", "Vec", "contains"]) !=
+/// true`.
+///
+/// This is intended to be used to match the internal `kanitool` family of
+/// attributes which we know to have a regular structure and no arguments.
 fn matches_path<E>(path: &syn::Path, mtch: &[E]) -> bool
 where
     Ident: std::cmp::PartialEq<E>,
@@ -400,10 +411,12 @@ impl ContractFunctionState {
                 let reentry_ident =
                     identifier_for_generated_function(item_fn, "reentry_var", a_short_hash);
 
-                // Constructing string literals explicitly here, because if we call
-                // `stringify!` in the generated code that is passed on as that
-                // expression to the next expansion of a contract, not as the
-                // literal.
+                // Constructing string literals explicitly here, because `stringify!`
+                // doesn't work. Let's say we have an identifier `check_fn` and we were
+                // to do `quote!(stringify!(check_fn))` to try to have it expand to
+                // `"check_fn"` in the generated code. Then when the next macro parses
+                // this it will *not* see the literal `"check_fn"` as you may expect but
+                // instead the *expression* `stringify!(check_fn)`.
                 let replace_fn_name_str =
                     syn::LitStr::new(&replace_fn_name.to_string(), Span::call_site());
                 let dummy_fn_name_str =
@@ -520,7 +533,7 @@ struct PostconditionInjector(TokenStream2);
 impl VisitMut for PostconditionInjector {
     /// We leave this emtpy to stop the recursion here. We don't want to look
     /// inside the closure, because the return statements contained within are
-    /// for a different function, duh.
+    /// for a different function.
     fn visit_expr_closure_mut(&mut self, _: &mut syn::ExprClosure) {}
 
     fn visit_expr_mut(&mut self, i: &mut Expr) {
@@ -548,11 +561,11 @@ impl VisitMut for PostconditionInjector {
 /// A supporting function for creating shallow, unsafe copies of the arguments
 /// for the postconditions.
 ///
-/// This function
-/// - Collects all [`Ident`]s found in the argument patterns
-/// - Creates new names for them
-/// - Replaces all occurrences of those idents in `attrs` with the new names and
-/// - Returns the mapping of old names to new names
+/// This function:
+/// - Collects all [`Ident`]s found in the argument patterns;
+/// - Creates new names for them;
+/// - Replaces all occurrences of those idents in `attrs` with the new names and;
+/// - Returns the mapping of old names to new names.
 fn rename_argument_occurrences(sig: &syn::Signature, attr: &mut Expr) -> HashMap<Ident, Ident> {
     let mut arg_ident_collector = ArgumentIdentCollector::new();
     arg_ident_collector.visit_signature(&sig);
@@ -803,11 +816,12 @@ fn pat_to_expr(pat: &Pat) -> Expr {
 /// added before the body and postconditions after as well as injected before
 /// every `return` (see [`PostconditionInjector`]). Attributes on the original
 /// function are also copied to the check function. Each clause (requires or
-/// ensures) after the first will be ignored on the original function (detected
-/// by finding the `kanitool::checked_with` attribute). On the check function
-/// (detected by finding the `kanitool::is_contract_generated` attribute) it
-/// expands into a new layer of pre- or postconditions. This state machine is
-/// also explained in more detail in comments in the body of this macro.
+/// ensures) after the first clause will be ignored on the original function
+/// (detected by finding the `kanitool::checked_with` attribute). On the check
+/// function (detected by finding the `kanitool::is_contract_generated`
+/// attribute) it expands into a new layer of pre- or postconditions. This state
+/// machine is also explained in more detail in comments in the body of this
+/// macro.
 ///
 /// In the check function all named arguments of the function are unsafely
 /// shallow-copied with the `kani::untracked_deref` function to circumvent the

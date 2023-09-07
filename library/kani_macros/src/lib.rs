@@ -7,7 +7,7 @@
 // downstream crates to enable these features as well.
 // So we have to enable this on the commandline (see kani-rustc) with:
 //   RUSTFLAGS="-Zcrate-attr=feature(register_tool) -Zcrate-attr=register_tool(kanitool)"
-#![feature(proc_macro_diagnostic, box_patterns)]
+#![feature(proc_macro_diagnostic)]
 
 mod derive;
 
@@ -97,7 +97,7 @@ pub fn derive_arbitrary(item: TokenStream) -> TokenStream {
     derive::expand_derive_arbitrary(item)
 }
 
-/// Add a precondition to this function.
+///  Add a precondition to this function.
 ///
 /// This is part of the function contract API, together with [`ensures`].
 ///
@@ -156,10 +156,10 @@ pub fn frees(attr: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// The harness is expected to set up the arguments that `foo` should be called
 /// with and initialzied any `static mut` globals that are reachable. All of
-/// these should be initialized to as general a value as possible, usually
+/// these should be initialized to as general value as possible, usually
 /// achieved using `kani::any`. The harness must call e.g. `foo` at least once
 /// and if `foo` has type parameters, only one instantiation of those parameters
-/// is admissable. Violating either results in a compile error.
+/// is admissible. Violating either results in a compile error.
 ///
 /// If any of those types have special invariants you can use `kani::assume` to
 /// enforce them, but other than condition on inputs and checks of outputs
